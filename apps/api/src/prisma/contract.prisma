@@ -1,0 +1,75 @@
+// use prisma-next
+
+model User {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  passwordHash    String   @default("")
+  username        String?
+  name            String?
+  currentRole     String?  // e.g. "Software Engineer", "Student", "Job Seeker"
+  targetCompany   String?  // e.g. "Stripe"
+  targetRole      String?  // e.g. "Senior Payments Infrastructure Engineer"
+  interviewTypes  String?  // JSON string array e.g. ["System Design", "Coding"]
+  experienceLevel String?  // e.g. "Mid-Senior"
+  isOnboarded     Boolean  @default(false)
+  posts           Post[]
+  createdAt       TimestamptzString @default(now())
+  updatedAt       temporal.updatedAtString()
+}
+
+model Post {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String?
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  Int
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+}
+
+model InterviewExperience {
+  id              String   @id @default(uuid())
+  company         String
+  role            String
+  level           String?  @default("Mid-Senior")
+  summary         String?
+  difficulty      String   @default("Medium")
+  topics          String   // JSON string array of topics e.g. ["System Design", "Concurrency"]
+  rounds          String   // JSON string array of rounds with personas & questions
+  questions       String   // JSON string array of questions
+  evaluationAreas String   // JSON string array of key assessment criteria
+  upvotes         Int      @default(0)
+  authorName      String   @default("Anonymous")
+  isVerified      Boolean  @default(true)
+  createdAt       TimestamptzString @default(now())
+  updatedAt       temporal.updatedAtString()
+}
+
+model InterviewSession {
+  id               String   @id @default(uuid())
+  candidateName    String   @default("Candidate")
+  company          String
+  role             String
+  jobDescription   String?
+  resumeText       String?
+  githubUrl        String?
+  status           String   @default("CREATED") // CREATED, IN_PROGRESS, COMPLETED
+  currentRoundIndex Int     @default(0)
+  blueprint        String   // JSON string storing full interview rounds & personas
+  transcripts      String   @default("[]") // JSON string of conversation turns across rounds
+  overallScore     Int?
+  evaluations      String?  // JSON string storing detailed score breakdown & feedback
+  agoraChannelName String
+  createdAt        TimestamptzString @default(now())
+  updatedAt        temporal.updatedAtString()
+}
+
+model ContributionDraft {
+  id          String   @id @default(uuid())
+  rawContent  String
+  parsedData  String   // JSON string of AI parsed rounds, questions, topics, difficulty
+  status      String   @default("DRAFT") // DRAFT, PUBLISHED
+  createdAt   TimestamptzString @default(now())
+  updatedAt   temporal.updatedAtString()
+}
+
