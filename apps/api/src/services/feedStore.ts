@@ -1,4 +1,4 @@
-import { INITIAL_COMMUNITY_FEED, SeedExperience } from '../data/seedFeed';
+import { INITIAL_COMMUNITY_FEED, SeedExperience } from '../data/seedFeed.js';
 
 // Shared in-memory feed store (used by the feed endpoints and the platform's feed-clip flow)
 export const feedStore: SeedExperience[] = [...INITIAL_COMMUNITY_FEED];
@@ -21,15 +21,39 @@ export interface FeedComment {
   createdAt: string;
 }
 
+// Per-user vote tracking: userId -> experienceId -> 1 | -1
+const userVotes: Record<string, Record<string, 1 | -1>> = {};
 const votes: Record<string, { up: number; down: number }> = {};
 const comments: Record<string, FeedComment[]> = {};
 
-export function voteFeedExperience(id: string, dir: 1 | -1): { up: number; down: number; net: number } {
+export function voteFeedExperience(id: string, dir: 1 | -1, userId: string = "anonymous"): { up: number; down: number; net: number; userVote: 1 | -1 | 0 } {
+  if (!userVotes[userId]) userVotes[userId] = {};
+  const currentVote = userVotes[userId][id] || 0;
   const v = votes[id] || { up: 0, down: 0 };
-  if (dir === 1) v.up += 1;
-  if (dir === -1) v.down += 1;
+
+  if (currentVote === dir) {
+    // Toggle off vote
+    if (dir === 1) v.up = Math.max(0, v.up - 1);
+    if (dir === -1) v.down = Math.max(0, v.down - 1);
+    delete userVotes[userId][id];
+  } else {
+    // Remove previous vote if switching
+    if (currentVote === 1) v.up = Math.max(0, v.up - 1);
+    if (currentVote === -1) v.down = Math.max(0, v.down - 1);
+
+    // Apply new vote
+    if (dir === 1) v.up += 1;
+    if (dir === -1) v.down += 1;
+    userVotes[userId][id] = dir;
+  }
+
   votes[id] = v;
-  return { ...v, net: v.up - v.down };
+  const newUserVote = userVotes[userId][id] || 0;
+  return { ...v, net: v.up - v.down, userVote: newUserVote };
+}
+
+export function getUserFeedVote(id: string, userId: string = "anonymous"): 1 | -1 | 0 {
+  return userVotes[userId]?.[id] || 0;
 }
 
 export function getFeedEngagement(id: string) {

@@ -1,12 +1,17 @@
-import { RtcTokenBuilder, RtcRole } from 'agora-token';
+import { RtcTokenBuilder, RtcRole } from "agora-token";
 
 // ---------------------------------------------------------------------------
 // Agora RTC — token issuance for the candidate's live room
 // ---------------------------------------------------------------------------
 
-export function generateAgoraToken(channelName: string, uid: number | string = 0): { token: string; appId: string; channelName: string } {
-  const appId = process.env.AGORA_APP_ID || "8a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d";
-  const appCertificate = process.env.AGORA_APP_CERTIFICATE || "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d";
+export function generateAgoraToken(
+  channelName: string,
+  uid: number | string = 0,
+): { token: string; appId: string; channelName: string } {
+  const appId =
+    process.env.AGORA_APP_ID || "8a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d";
+  const appCertificate =
+    process.env.AGORA_APP_CERTIFICATE || "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d";
   const role = RtcRole.PUBLISHER;
   const expirationTimeInSeconds = 3600 * 24;
   const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -19,10 +24,10 @@ export function generateAgoraToken(channelName: string, uid: number | string = 0
         appId,
         appCertificate,
         channelName,
-        typeof uid === 'number' ? uid : 0,
+        typeof uid === "number" ? uid : 0,
         role,
         privilegeExpiredTs,
-        privilegeExpiredTs
+        privilegeExpiredTs,
       );
     } else {
       // Mock / Sandbox Token for development when secrets are not yet configured
@@ -33,11 +38,7 @@ export function generateAgoraToken(channelName: string, uid: number | string = 0
     token = `agora_demo_token_${channelName}_${Date.now()}`;
   }
 
-  return {
-    token,
-    appId,
-    channelName,
-  };
+  return { token, appId, channelName };
 }
 
 // ---------------------------------------------------------------------------
@@ -45,17 +46,17 @@ export function generateAgoraToken(channelName: string, uid: number | string = 0
 //
 // Each interviewer persona is hosted as an Agora Conversational AI Agent that
 // joins the same RTC channel as the candidate, listens via its microphone, and
-// speaks through TTS using an LLM grounded in the persona's system prompt.
+// speaks through TTS using an LLM (Gemini by default) grounded in the persona's
+// system prompt. The candidate talks to the agent directly.
 //
-// Wire-up contract (no SDK constants are hard-coded so you can point this at
-// your own Agora agent gateway / function):
-//   AGORA_AGENT_ENDPOINT  -> base URL that implements start/stop for an agent
-//   AGORA_AGENT_ID        -> identifier of the agent (uid / app id) to join
-//   AGORA_AGENT_KEY       -> secret used to authenticate to your gateway
-//
-// Until AGORA_AGENT_ENDPOINT is configured, the service returns a *simulated*
-// agent payload so the full flow (join RTC room, show speakers, drive the
-// transcript engine) still works in development.
+// Live mode is enabled in one of two ways:
+//   1. Agora RESTful API credentials:
+//        AGORA_APP_ID + AGORA_APP_CERTIFICATE  (sign the RTC token the agent joins with)
+//        AGORA_CUSTOMER_ID + AGORA_CUSTOMER_SECRET (Basic auth for /dev/v1/conversational-ai-agent)
+//   2. Your own gateway implementing /start + /stop:
+//        AGORA_AGENT_ENDPOINT (+ AGORA_AGENT_KEY)
+// Until either is configured the service returns a *simulated* payload so the
+// full room flow still runs in development.
 // ---------------------------------------------------------------------------
 
 export interface AgoraAgentSpec {
@@ -70,7 +71,7 @@ export interface AgoraAgentSpec {
   ttsVoice: string;
   systemPrompt: string;
   greeting: string;
-  // llm hook (optional — used when your agent gateway forwards prompts)
+  // llm hook
   llm?: {
     provider?: string;
     model?: string;
@@ -78,8 +79,21 @@ export interface AgoraAgentSpec {
   };
 }
 
+const CONVERSATIONAL_API = "https://api.agora.io/dev/v1/conversational-ai-agent";
+
 export function isAgentConfigured(): boolean {
-  return !!(process.env.AGORA_AGENT_ENDPOINT && process.env.AGORA_AGENT_ID);
+  return !!(
+    (process.env.AGORA_CUSTOMER_ID &&
+      process.env.AGORA_CUSTOMER_SECRET &&
+      process.env.AGORA_APP_ID) ||
+    process.env.AGORA_AGENT_ENDPOINT
+  );
+}
+
+function basicAuth(): string {
+  const id = process.env.AGORA_CUSTOMER_ID || "";
+  const secret = process.env.AGORA_CUSTOMER_SECRET || "";
+  return `Basic ${Buffer.from(`${id}:${secret}`).toString("base64")}`;
 }
 
 export function buildAgentSpec(params: {
@@ -94,19 +108,22 @@ export function buildAgentSpec(params: {
   uid?: number;
 }): AgoraAgentSpec {
   return {
-    agentId: process.env.AGORA_AGENT_ID || 'agent-mock',
+    agentId: process.env.AGORA_AGENT_ID || "agent-mock",
     appId: params.appId,
     channelName: params.channelName,
     token: params.token,
     uid: params.uid ?? 888, // the agent always joins with this fixed uid
     interviewerName: params.interviewerName,
     interviewerRole: params.interviewerRole,
-    ttsVoice: params.ttsVoice || process.env.AGORA_AGENT_TTS_VOICE || 'en-US-Studio-Multilingual',
+    ttsVoice:
+      params.ttsVoice ||
+      process.env.AGORA_AGENT_TTS_VOICE ||
+      "en-US-Studio-Multilingual",
     systemPrompt: params.systemPrompt,
     greeting: params.greeting,
     llm: {
-      provider: process.env.AGORA_AGENT_LLM_PROVIDER || 'openai',
-      model: process.env.AGORA_AGENT_LLM_MODEL || 'gpt-4o-mini',
+      provider: process.env.AGORA_AGENT_LLM_PROVIDER || "google",
+      model: process.env.AGORA_AGENT_LLM_MODEL || "gemini-2.0-flash",
       temperature: 0.7,
     },
   };
@@ -114,59 +131,122 @@ export function buildAgentSpec(params: {
 
 async function gateway(path: string, body: unknown): Promise<any> {
   const endpoint = process.env.AGORA_AGENT_ENDPOINT!;
-  const key = process.env.AGORA_AGENT_KEY || '';
-  const res = await fetch(`${endpoint.replace(/\/$/, '')}/${path.replace(/^\//, '')}`, {
-    method: 'POST',
+  const key = process.env.AGORA_AGENT_KEY || "";
+  const res = await fetch(
+    `${endpoint.replace(/\/$/, "")}/${path.replace(/^\//, "")}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(key ? { Authorization: `Bearer ${key}` } : {}),
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(
+      `Agora agent gateway error ${res.status}: ${text.slice(0, 300)}`,
+    );
+  }
+  return res.json();
+}
+
+async function agoraRest(path: string, body: unknown): Promise<any> {
+  const res = await fetch(`${CONVERSATIONAL_API}/${path.replace(/^\//, "")}`, {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+      "Content-Type": "application/json",
+      Authorization: basicAuth(),
     },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Agora agent gateway error ${res.status}: ${text.slice(0, 300)}`);
+    throw new Error(
+      `Agora conversational-agent error ${res.status}: ${text.slice(0, 300)}`,
+    );
   }
   return res.json();
 }
 
 export interface AgentStartResult {
   ok: boolean;
-  mode: 'live' | 'simulated';
+  mode: "live" | "simulated";
   spec: AgoraAgentSpec;
   detail?: any;
   error?: string;
 }
 
-export async function startAIAgent(spec: AgoraAgentSpec): Promise<AgentStartResult> {
+export async function startAIAgent(
+  spec: AgoraAgentSpec,
+): Promise<AgentStartResult> {
   if (!isAgentConfigured()) {
-    return { ok: true, mode: 'simulated', spec };
+    return { ok: true, mode: "simulated", spec };
   }
+
+  // Agora Conversational AI Agents body — one agent = one interviewer persona.
+  const body = {
+    name: `interviewer-${spec.interviewerName
+      .toLowerCase()
+      .replace(/\s+/g, "-")}`,
+    properties: {
+      channel: {
+        channelName: spec.channelName,
+        token: spec.token,
+        uid: spec.uid,
+      },
+      llm: {
+        provider: spec.llm?.provider || "google",
+        config: {
+          model: spec.llm?.model || "gemini-2.0-flash",
+          systemPrompt: spec.systemPrompt,
+          temperature: spec.llm?.temperature ?? 0.7,
+          maxOutputTokens: 500,
+        },
+      },
+      tts: {
+        provider: process.env.AGORA_AGENT_TTS_PROVIDER || "microsoft",
+        config: { voice: spec.ttsVoice },
+      },
+      greeting: spec.greeting,
+    },
+  };
+
   try {
-    const detail = await gateway('/start', spec);
-    return { ok: true, mode: 'live', spec, detail };
+    const detail = process.env.AGORA_CUSTOMER_ID
+      ? await agoraRest("/start", body)
+      : await gateway("/start", body);
+    return { ok: true, mode: "live", spec, detail };
   } catch (err: any) {
-    return { ok: false, mode: 'simulated', spec, error: err.message };
+    return { ok: false, mode: "simulated", spec, error: err.message };
   }
 }
 
 export interface AgentStopResult {
   ok: boolean;
-  mode: 'live' | 'simulated';
+  mode: "live" | "simulated";
   channelName: string;
   detail?: any;
   error?: string;
 }
 
-export async function stopAIAgent(channelName: string, agentId?: string): Promise<AgentStopResult> {
+export async function stopAIAgent(
+  channelName: string,
+  taskId?: string,
+): Promise<AgentStopResult> {
   if (!isAgentConfigured()) {
-    return { ok: true, mode: 'simulated', channelName };
+    return { ok: true, mode: "simulated", channelName };
   }
+  const body: any = { channelName };
+  if (taskId) body.taskId = taskId;
   try {
-    const detail = await gateway('/stop', { channelName, agentId });
-    return { ok: true, mode: 'live', channelName, detail };
+    const detail = process.env.AGORA_CUSTOMER_ID
+      ? await agoraRest("/stop", body)
+      : await gateway("/stop", body);
+    return { ok: true, mode: "live", channelName, detail };
   } catch (err: any) {
-    return { ok: false, mode: 'simulated', channelName, error: err.message };
+    return { ok: false, mode: "simulated", channelName, error: err.message };
   }
 }
 

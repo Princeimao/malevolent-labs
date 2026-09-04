@@ -50,7 +50,9 @@ const onboardingSchema = z.object({
   experienceLevel: z.string().min(1, "Select your experience level"),
   targetCompany: z.string().min(1, "Enter your target company"),
   targetRole: z.string().min(1, "Enter your target role"),
-  interviewTypes: z.array(z.string()).min(1, "Pick at least one interview type"),
+  interviewTypes: z
+    .array(z.string())
+    .min(1, "Pick at least one interview type"),
   weeklyGoal: z.string().min(1, "Select a practice goal"),
 });
 
@@ -59,7 +61,9 @@ type OnboardingValues = z.infer<typeof onboardingSchema>;
 export default function OnboardingPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isAuthenticated, isInitialized, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, isInitialized, user } = useAppSelector(
+    (state) => state.auth,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -107,242 +111,225 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans">
+    <div className="min-h-screen bg-paper font-sans">
       <div className="mx-auto max-w-2xl px-4 py-10 md:py-16">
-        {/* Brand */}
-        <div className="mb-8 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="p-2 rounded-lg bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500">
-              <Video className="size-4 text-white" />
-            </span>
-            <span className="font-bold tracking-tight">{PLATFORM_NAME}</span>
-          </Link>
-          <span className="text-xs text-neutral-500">
-            Step 1 of 1 · Quick setup
-          </span>
-        </div>
+        <CardHeader className="space-y-2">
+          <CardTitle className="text-3xl font-bold tracking-tight text-center">
+            Let's personalize your practice
+          </CardTitle>
+          <CardDescription className="text-neutral-400 text-center">
+            Tell us what you're doing today and what interview you're practicing
+            for — we'll tailor every simulation to you.
+          </CardDescription>
+        </CardHeader>
 
-        <Card className="border-white/10 bg-white/[0.03] shadow-2xl">
-          <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl font-bold tracking-tight">
-              Let's personalize your practice
-            </CardTitle>
-            <CardDescription className="text-neutral-400">
-              Tell us what you're doing today and what interview you're practicing
-              for — we'll tailor every simulation to you.
-            </CardDescription>
-          </CardHeader>
+        {error && (
+          <div className="mb-6 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+            {error}
+          </div>
+        )}
 
-          <CardContent>
-            {error && (
-              <div className="mb-6 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
-                {error}
-              </div>
-            )}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <FieldGroup className="mt-10">
+              <h1 className="text-2xl font-bold tracking-tight">
+                What are you currently doing?
+              </h1>
+              <FormField
+                control={form.control}
+                name="currentRole"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Current role</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select your current role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ONBOARDING_OPTIONS.currentRoles.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      We use this to calibrate question difficulty and tone.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-8"
-              >
-                <FieldGroup>
-                  <FieldLegend>What are you currently doing?</FieldLegend>
+              <FormField
+                control={form.control}
+                name="experienceLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Experience level</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select your experience level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ONBOARDING_OPTIONS.experienceLevels.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGroup>
 
-                  <FormField
-                    control={form.control}
-                    name="currentRole"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Current role</FormLabel>
-                        <FormControl>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select your current role" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ONBOARDING_OPTIONS.currentRoles.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormDescription>
-                          We use this to calibrate question difficulty and tone.
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+            <FieldGroup>
+              <FieldLegend>What interview are you practicing for?</FieldLegend>
 
-                  <FormField
-                    control={form.control}
-                    name="experienceLevel"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Experience level</FormLabel>
-                        <FormControl>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select your experience level" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ONBOARDING_OPTIONS.experienceLevels.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </FieldGroup>
-
-                <FieldGroup>
-                  <FieldLegend>What interview are you practicing for?</FieldLegend>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="targetCompany"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Target company</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="text"
-                              placeholder="e.g. Stripe, Google, Meta"
-                              disabled={submitting}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="targetRole"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Target role</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="text"
-                              placeholder="e.g. Senior Payments Engineer"
-                              disabled={submitting}
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="interviewTypes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Interview types to practice</FormLabel>
-                        <FormControl>
-                          <Field className="mt-2">
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              {ONBOARDING_OPTIONS.interviewTypes.map((opt) => {
-                                const checked = field.value.includes(opt.value);
-                                return (
-                                  <FieldLabel
-                                    key={opt.value}
-                                    className="w-full flex-row items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5 text-sm font-medium hover:bg-white/[0.06] cursor-pointer"
-                                  >
-                                    <Checkbox
-                                      checked={checked}
-                                      onCheckedChange={(next) => {
-                                        const nextValue = next
-                                          ? [...field.value, opt.value]
-                                          : field.value.filter((v) => v !== opt.value);
-                                        field.onChange(nextValue);
-                                      }}
-                                    />
-                                    <span>{opt.label}</span>
-                                  </FieldLabel>
-                                );
-                              })}
-                            </div>
-                          </Field>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </FieldGroup>
-
-                <FieldGroup>
-                  <FieldLegend>Your practice rhythm</FieldLegend>
-
-                  <FormField
-                    control={form.control}
-                    name="weeklyGoal"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>How often do you plan to practice?</FormLabel>
-                        <FormControl>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select a practice goal" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ONBOARDING_OPTIONS.weeklyGoals.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </FormControl>
-                        <FieldDescription>
-                          We'll build a recommendation queue around this.
-                        </FieldDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </FieldGroup>
-
-                <Button
-                  type="submit"
-                  disabled={submitting}
-                  size="lg"
-                  className="w-full bg-white text-black hover:bg-neutral-200"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="animate-spin" />
-                      Setting up your profile...
-                    </>
-                  ) : (
-                    "Save & Go to Dashboard"
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="targetCompany"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Target company</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          placeholder="e.g. Stripe, Google, Meta"
+                          disabled={submitting}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+                />
+
+                <FormField
+                  control={form.control}
+                  name="targetRole"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Target role</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          placeholder="e.g. Senior Payments Engineer"
+                          disabled={submitting}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="interviewTypes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Interview types to practice</FormLabel>
+                    <FormControl>
+                      <Field className="mt-2">
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {ONBOARDING_OPTIONS.interviewTypes.map((opt) => {
+                            const checked = field.value.includes(opt.value);
+                            return (
+                              <FieldLabel
+                                key={opt.value}
+                                className="w-full flex-row items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5 text-sm font-medium hover:bg-white/[0.06] cursor-pointer"
+                              >
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(next) => {
+                                    const nextValue = next
+                                      ? [...field.value, opt.value]
+                                      : field.value.filter(
+                                          (v) => v !== opt.value,
+                                        );
+                                    field.onChange(nextValue);
+                                  }}
+                                />
+                                <span>{opt.label}</span>
+                              </FieldLabel>
+                            );
+                          })}
+                        </div>
+                      </Field>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGroup>
+
+            <FieldGroup>
+              <FieldLegend>Your practice rhythm</FieldLegend>
+
+              <FormField
+                control={form.control}
+                name="weeklyGoal"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>How often do you plan to practice?</FormLabel>
+                    <FormControl>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select a practice goal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ONBOARDING_OPTIONS.weeklyGoals.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FieldDescription>
+                      We'll build a recommendation queue around this.
+                    </FieldDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </FieldGroup>
+
+            <Button
+              type="submit"
+              disabled={submitting}
+              size="lg"
+              className="w-full bg-white text-black hover:bg-neutral-200"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Setting up your profile...
+                </>
+              ) : (
+                "Save & Go to Dashboard"
+              )}
+            </Button>
+          </form>
+        </Form>
       </div>
     </div>
   );

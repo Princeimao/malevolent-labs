@@ -521,6 +521,13 @@
           },
           "User": {
             "fields": {
+              "contributorType": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "createdAt": {
                 "nullable": false,
                 "type": {
@@ -560,6 +567,13 @@
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "isContributor": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
                   "kind": "scalar"
                 }
               },
@@ -632,6 +646,9 @@
             },
             "storage": {
               "fields": {
+                "contributorType": {
+                  "column": "contributorType"
+                },
                 "createdAt": {
                   "column": "createdAt"
                 },
@@ -649,6 +666,9 @@
                 },
                 "interviewTypes": {
                   "column": "interviewTypes"
+                },
+                "isContributor": {
+                  "column": "isContributor"
                 },
                 "isOnboarded": {
                   "column": "isOnboarded"
@@ -1036,6 +1056,11 @@
             },
             "user": {
               "columns": {
+                "contributorType": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "createdAt": {
                   "codecId": "pg/timestamptz-string@1",
                   "default": {
@@ -1073,6 +1098,15 @@
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
+                },
+                "isContributor": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
                 },
                 "isOnboarded": {
                   "codecId": "pg/bool@1",
@@ -1139,7 +1173,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "915e41c84cad22762ee5966c37f159e86cd8ba6460a737640f7b4d614afd28ed"
+    "storageHash": "718486f52da8684aafca17ed59dea82fe074386e24df97e817e5f9a9dd00ab27"
   },
   "execution": {
     "executionHash": "986c0d376a6dc852a7cdcb31e69f485c27e739c3a3858ccee5bb80d6a003c9f1",

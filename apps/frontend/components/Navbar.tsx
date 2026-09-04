@@ -37,12 +37,12 @@ export default function Navbar() {
       <NavbarComp>
         {/* Desktop Navigation */}
         <NavBody>
-          <Link href="/" className="flex items-center gap-2 font-bold text-lg text-white">
-            <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 shadow-lg shadow-indigo-500/20">
-              <Video className="w-5 h-5 text-white" />
-            </div>
+          <Link
+            href="/"
+            className="flex items-center gap-2 font-bold text-lg text-white"
+          >
             <span className="tracking-tight bg-gradient-to-r from-white via-neutral-200 to-neutral-400 bg-clip-text text-transparent">
-              Agora<span className="text-indigo-400 font-extrabold">Interview</span>
+              Agora
             </span>
           </Link>
 
@@ -56,7 +56,10 @@ export default function Navbar() {
               </NavbarButton>
             </Link>
             <Link href="/simulator">
-              <NavbarButton variant="primary" className="text-xs md:text-sm bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-0 shadow-lg shadow-indigo-500/25 hover:opacity-90">
+              <NavbarButton
+                variant="primary"
+                className="text-xs md:text-sm bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-0 shadow-lg shadow-indigo-500/25 hover:opacity-90"
+              >
                 <Sparkles className="w-4 h-4 mr-1.5 inline text-indigo-200" />
                 Start Simulation
               </NavbarButton>
@@ -67,7 +70,10 @@ export default function Navbar() {
         {/* Mobile Navigation */}
         <MobileNav>
           <MobileNavHeader>
-            <Link href="/" className="flex items-center gap-2 font-bold text-lg text-white">
+            <Link
+              href="/"
+              className="flex items-center gap-2 font-bold text-lg text-white"
+            >
               <div className="p-1.5 rounded-lg bg-indigo-600">
                 <Video className="w-4 h-4 text-white" />
               </div>

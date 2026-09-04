@@ -1,8 +1,11 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 function authHeaders(): Record<string, string> {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('agora_interview_token');
+  if (typeof window !== "undefined") {
+    const token =
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("agora_interview_token");
     if (token) return { Authorization: `Bearer ${token}` };
   }
   return {};
@@ -21,29 +24,36 @@ export interface AuthResponse {
   error?: string;
 }
 
-export async function loginApi(email: string, password: string): Promise<AuthResponse> {
+export async function loginApi(
+  email: string,
+  password: string,
+): Promise<AuthResponse> {
   try {
     const res = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
     return await res.json();
   } catch (err: any) {
-    return { success: false, error: err.message || 'Login failed' };
+    return { success: false, error: err.message || "Login failed" };
   }
 }
 
-export async function signupApi(email: string, password: string, name?: string): Promise<AuthResponse> {
+export async function signupApi(
+  email: string,
+  password: string,
+  name?: string,
+): Promise<AuthResponse> {
   try {
     const res = await fetch(`${API_BASE_URL}/auth/signup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, name }),
     });
     return await res.json();
   } catch (err: any) {
-    return { success: false, error: err.message || 'Signup failed' };
+    return { success: false, error: err.message || "Signup failed" };
   }
 }
 
@@ -54,7 +64,7 @@ export async function getMeApi(token: string): Promise<AuthResponse> {
     });
     return await res.json();
   } catch (err: any) {
-    return { success: false, error: err.message || 'Authentication error' };
+    return { success: false, error: err.message || "Authentication error" };
   }
 }
 
@@ -183,30 +193,39 @@ export interface InterviewSession {
   evaluations?: FinalEvaluation;
 }
 
-export async function fetchFeed(params?: { company?: string; role?: string; topic?: string; query?: string }): Promise<FeedItem[]> {
+export async function fetchFeed(params?: {
+  company?: string;
+  role?: string;
+  topic?: string;
+  query?: string;
+}): Promise<FeedItem[]> {
   try {
     const url = new URL(`${API_BASE_URL}/feed`);
-    if (params?.company) url.searchParams.append('company', params.company);
-    if (params?.role) url.searchParams.append('role', params.role);
-    if (params?.topic) url.searchParams.append('topic', params.topic);
-    if (params?.query) url.searchParams.append('query', params.query);
+    if (params?.company) url.searchParams.append("company", params.company);
+    if (params?.role) url.searchParams.append("role", params.role);
+    if (params?.topic) url.searchParams.append("topic", params.topic);
+    if (params?.query) url.searchParams.append("query", params.query);
 
     const res = await fetch(url.toString(), { headers: authHeaders() });
     const data = await res.json();
     return data.feed || [];
   } catch (err) {
-    console.error('Error fetching feed:', err);
+    console.error("Error fetching feed:", err);
     return [];
   }
 }
 
-export async function fetchExperienceById(id: string): Promise<FeedItem | null> {
+export async function fetchExperienceById(
+  id: string,
+): Promise<FeedItem | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/feed/${id}`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE_URL}/feed/${id}`, {
+      headers: authHeaders(),
+    });
     const data = await res.json();
     return data.experience || null;
   } catch (err) {
-    console.error('Error fetching experience:', err);
+    console.error("Error fetching experience:", err);
     return null;
   }
 }
@@ -230,77 +249,97 @@ export interface FeedItemDetail {
   comments: FeedComment[];
 }
 
-export async function fetchFeedItemDetail(id: string): Promise<FeedItemDetail | null> {
+export async function fetchFeedItemDetail(
+  id: string,
+): Promise<FeedItemDetail | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/feed/${id}`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE_URL}/feed/${id}`, {
+      headers: authHeaders(),
+    });
     const data = await res.json();
     if (!data.experience) return null;
     return { experience: data.experience, comments: data.comments || [] };
   } catch (err) {
-    console.error('Error fetching experience detail:', err);
+    console.error("Error fetching experience detail:", err);
     return null;
   }
 }
 
-export async function voteFeedItem(id: string, dir: 1 | -1): Promise<FeedEngagement | null> {
+export async function voteFeedItem(
+  id: string,
+  dir: 1 | -1,
+): Promise<FeedEngagement | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/feed/${id}/vote`, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ dir }),
     });
     const data = await res.json();
     return data.engagement || null;
   } catch (err) {
-    console.error('Error voting:', err);
+    console.error("Error voting:", err);
     return null;
   }
 }
 
-export async function addExperienceComment(id: string, text: string): Promise<FeedComment[]> {
+export async function addExperienceComment(
+  id: string,
+  text: string,
+): Promise<FeedComment[]> {
   try {
     const res = await fetch(`${API_BASE_URL}/feed/${id}/comments`, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
     const data = await res.json();
     return data.comments || [];
   } catch (err) {
-    console.error('Error commenting:', err);
+    console.error("Error commenting:", err);
     return [];
   }
 }
 
-export async function voteInterviewTemplate(id: string, dir: 1 | -1): Promise<{ votesUp: number; votesDown: number; netVotes: number } | null> {
+export async function voteInterviewTemplate(
+  id: string,
+  dir: 1 | -1,
+): Promise<{ votesUp: number; votesDown: number; netVotes: number } | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/interview-templates/${id}/vote`, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ dir }),
     });
     const data = await res.json();
     return data || null;
   } catch (err) {
-    console.error('Error voting template:', err);
+    console.error("Error voting template:", err);
     return null;
   }
 }
 
 export async function parseContribution(rawContent: string): Promise<any> {
   const res = await fetch(`${API_BASE_URL}/feed/parse`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ rawContent }),
   });
   const data = await res.json();
   return data.parsedData;
 }
 
-export async function publishContribution(experienceData: Partial<FeedItem> & { storyHtml?: string; durationMinutes?: number; feel?: string; format?: string }): Promise<FeedItem> {
+export async function publishContribution(
+  experienceData: Partial<FeedItem> & {
+    storyHtml?: string;
+    durationMinutes?: number;
+    feel?: string;
+    format?: string;
+  },
+): Promise<FeedItem> {
   const res = await fetch(`${API_BASE_URL}/feed/publish`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(experienceData),
   });
   const data = await res.json();
@@ -317,7 +356,10 @@ export interface BankQuestion {
   down: number;
 }
 
-export async function searchQuestions(params: { q?: string; company?: string }): Promise<BankQuestion[]> {
+export async function searchQuestions(params: {
+  q?: string;
+  company?: string;
+}): Promise<BankQuestion[]> {
   try {
     const url = new URL(`${API_BASE_URL}/questions`);
     if (params.q) url.searchParams.append("q", params.q);
@@ -331,7 +373,10 @@ export async function searchQuestions(params: { q?: string; company?: string }):
   }
 }
 
-export async function voteQuestion(text: string, dir: 1 | -1): Promise<BankQuestion | null> {
+export async function voteQuestion(
+  text: string,
+  dir: 1 | -1,
+): Promise<BankQuestion | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/questions/vote`, {
       method: "POST",
@@ -355,26 +400,33 @@ export async function createInterviewSession(payload: {
   candidateName?: string;
 }): Promise<InterviewSession> {
   const res = await fetch(`${API_BASE_URL}/interviews/create`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   const data = await res.json();
   return data.session;
 }
 
-export async function fetchInterviewSession(id: string): Promise<InterviewSession | null> {
+export async function fetchInterviewSession(
+  id: string,
+): Promise<InterviewSession | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/interviews/${id}`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE_URL}/interviews/${id}`, {
+      headers: authHeaders(),
+    });
     const data = await res.json();
     return data.session || null;
   } catch (err) {
-    console.error('Error fetching session:', err);
+    console.error("Error fetching session:", err);
     return null;
   }
 }
 
-export async function sendInterviewInteraction(id: string, candidateInput: string): Promise<{
+export async function sendInterviewInteraction(
+  id: string,
+  candidateInput: string,
+): Promise<{
   nextTurn: ConversationTurn;
   activeInterviewer: Persona;
   shouldAdvanceRound: boolean;
@@ -383,18 +435,20 @@ export async function sendInterviewInteraction(id: string, candidateInput: strin
   transcripts: ConversationTurn[];
 }> {
   const res = await fetch(`${API_BASE_URL}/interviews/${id}/interact`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ candidateInput }),
   });
   const data = await res.json();
   return data;
 }
 
-export async function evaluateInterview(id: string): Promise<{ evaluation: FinalEvaluation; session: InterviewSession }> {
+export async function evaluateInterview(
+  id: string,
+): Promise<{ evaluation: FinalEvaluation; session: InterviewSession }> {
   const res = await fetch(`${API_BASE_URL}/interviews/${id}/evaluate`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
   });
   const data = await res.json();
   return data;
@@ -510,8 +564,8 @@ export async function createAgent(payload: {
   isCommunity?: boolean;
 }): Promise<Agent> {
   const res = await fetch(`${API_BASE_URL}/agents`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   const data = await res.json();
@@ -520,18 +574,21 @@ export async function createAgent(payload: {
 
 export async function fetchAgents(mineOnly = false): Promise<Agent[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/agents${mineOnly ? '?mine=true' : ''}`, { headers: authHeaders() });
+    const res = await fetch(
+      `${API_BASE_URL}/agents${mineOnly ? "?mine=true" : ""}`,
+      { headers: authHeaders() },
+    );
     const data = await res.json();
     return data.agents || [];
   } catch (err) {
-    console.error('Error fetching agents:', err);
+    console.error("Error fetching agents:", err);
     return [];
   }
 }
 
 export async function deleteAgent(id: string): Promise<boolean> {
   const res = await fetch(`${API_BASE_URL}/agents/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: authHeaders(),
   });
   return res.ok;
@@ -547,68 +604,85 @@ export async function createInterviewTemplate(payload: {
   rounds: TemplateRound[];
 }): Promise<InterviewTemplate> {
   const res = await fetch(`${API_BASE_URL}/interview-templates`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   const data = await res.json();
   return data.template;
 }
 
-export async function fetchInterviewTemplates(scope: "public" | "mine" = "public"): Promise<InterviewTemplate[]> {
+export async function fetchInterviewTemplates(
+  scope: "public" | "mine" = "public",
+): Promise<InterviewTemplate[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/interview-templates?scope=${scope}`, { headers: authHeaders() });
+    const res = await fetch(
+      `${API_BASE_URL}/interview-templates?scope=${scope}`,
+      { headers: authHeaders() },
+    );
     const data = await res.json();
     return data.templates || [];
   } catch (err) {
-    console.error('Error fetching templates:', err);
+    console.error("Error fetching templates:", err);
     return [];
   }
 }
 
-export async function fetchInterviewTemplate(id: string): Promise<InterviewTemplate | null> {
+export async function fetchInterviewTemplate(
+  id: string,
+): Promise<InterviewTemplate | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/interview-templates/${id}`, { headers: authHeaders() });
-    const data = await res.json();
-    return data.template || null;
-  } catch (err) {
-    console.error('Error fetching template:', err);
-    return null;
-  }
-}
-
-export async function publishInterviewTemplate(id: string): Promise<InterviewTemplate | null> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/interview-templates/${id}/publish`, {
-      method: 'POST',
+    const res = await fetch(`${API_BASE_URL}/interview-templates/${id}`, {
       headers: authHeaders(),
     });
     const data = await res.json();
     return data.template || null;
   } catch (err) {
-    console.error('Error publishing template:', err);
+    console.error("Error fetching template:", err);
     return null;
   }
 }
 
-export async function rateInterviewTemplate(id: string, rating: number): Promise<{ ratingAvg: number; ratingCount: number }> {
+export async function publishInterviewTemplate(
+  id: string,
+): Promise<InterviewTemplate | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/interview-templates/${id}/publish`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
+    const data = await res.json();
+    return data.template || null;
+  } catch (err) {
+    console.error("Error publishing template:", err);
+    return null;
+  }
+}
+
+export async function rateInterviewTemplate(
+  id: string,
+  rating: number,
+): Promise<{ ratingAvg: number; ratingCount: number }> {
   try {
     const res = await fetch(`${API_BASE_URL}/interview-templates/${id}/rate`, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify({ rating }),
     });
     const data = await res.json();
     return { ratingAvg: data.ratingAvg, ratingCount: data.ratingCount };
   } catch (err) {
-    console.error('Error rating template:', err);
+    console.error("Error rating template:", err);
     return { ratingAvg: 0, ratingCount: 0 };
   }
 }
 
 export async function deleteInterviewTemplate(id: string): Promise<boolean> {
   const res = await fetch(`${API_BASE_URL}/interview-templates/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: authHeaders(),
   });
   return res.ok;
@@ -622,8 +696,8 @@ export async function createGoal(payload: {
   notes?: string;
 }): Promise<Goal> {
   const res = await fetch(`${API_BASE_URL}/goals`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   const data = await res.json();
@@ -632,18 +706,20 @@ export async function createGoal(payload: {
 
 export async function fetchGoals(): Promise<Goal[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/goals`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE_URL}/goals`, {
+      headers: authHeaders(),
+    });
     const data = await res.json();
     return data.goals || [];
   } catch (err) {
-    console.error('Error fetching goals:', err);
+    console.error("Error fetching goals:", err);
     return [];
   }
 }
 
 export async function deleteGoal(id: string): Promise<boolean> {
   const res = await fetch(`${API_BASE_URL}/goals/${id}`, {
-    method: 'DELETE',
+    method: "DELETE",
     headers: authHeaders(),
   });
   return res.ok;
@@ -659,8 +735,8 @@ export async function createPracticeSession(payload: {
   candidateName?: string;
 }): Promise<PracticeSession> {
   const res = await fetch(`${API_BASE_URL}/practice-sessions`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   const data = await res.json();
@@ -669,29 +745,35 @@ export async function createPracticeSession(payload: {
 
 export async function fetchPracticeSessions(): Promise<PracticeSession[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/practice-sessions`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE_URL}/practice-sessions`, {
+      headers: authHeaders(),
+    });
     const data = await res.json();
     return data.sessions || [];
   } catch (err) {
-    console.error('Error fetching practice sessions:', err);
+    console.error("Error fetching practice sessions:", err);
     return [];
   }
 }
 
-export async function fetchPracticeSession(id: string): Promise<PracticeSession | null> {
+export async function fetchPracticeSession(
+  id: string,
+): Promise<PracticeSession | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}`, {
+      headers: authHeaders(),
+    });
     const data = await res.json();
     return data.session || null;
   } catch (err) {
-    console.error('Error fetching practice session:', err);
+    console.error("Error fetching practice session:", err);
     return null;
   }
 }
 
 export async function sendPracticeInteraction(
   id: string,
-  candidateInput: string
+  candidateInput: string,
 ): Promise<{
   nextTurn: ConversationTurn;
   activeInterviewer: Persona;
@@ -699,8 +781,8 @@ export async function sendPracticeInteraction(
   transcripts: ConversationTurn[];
 }> {
   const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/interact`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ candidateInput }),
   });
   const data = await res.json();
@@ -713,27 +795,35 @@ export async function evaluatePracticeRound(id: string): Promise<{
   currentRoundIndex: number;
   roundResults: RoundResult[];
 }> {
-  const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/evaluate-round`, {
-    method: 'POST',
-    headers: authHeaders(),
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/practice-sessions/${id}/evaluate-round`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+    },
+  );
   const data = await res.json();
   return data;
 }
 
-export async function completePracticeSession(id: string): Promise<{ evaluation: FinalEvaluation; session: PracticeSession }> {
+export async function completePracticeSession(
+  id: string,
+): Promise<{ evaluation: FinalEvaluation; session: PracticeSession }> {
   const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/complete`, {
-    method: 'POST',
+    method: "POST",
     headers: authHeaders(),
   });
   const data = await res.json();
   return data;
 }
 
-export async function contributePracticeClip(id: string, title?: string): Promise<any> {
+export async function contributePracticeClip(
+  id: string,
+  title?: string,
+): Promise<any> {
   const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/feed-clip`, {
-    method: 'POST',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ title }),
   });
   const data = await res.json();
@@ -765,42 +855,55 @@ export interface PracticeRoundInfo {
   agora: { appId: string; channelName: string; token: string };
 }
 
-export async function fetchPracticeRound(id: string): Promise<PracticeRoundInfo | null> {
+export async function fetchPracticeRound(
+  id: string,
+): Promise<PracticeRoundInfo | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/round`, { headers: authHeaders() });
+    const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/round`, {
+      headers: authHeaders(),
+    });
     const data = await res.json();
     return data || null;
   } catch (err) {
-    console.error('Error fetching practice round:', err);
+    console.error("Error fetching practice round:", err);
     return null;
   }
 }
 
-export async function startSessionAgent(id: string, interviewerIndex = 0): Promise<any> {
+export async function startSessionAgent(
+  id: string,
+  interviewerIndex = 0,
+): Promise<any> {
   try {
-    const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/agent/start`, {
-      method: 'POST',
-      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ interviewerIndex }),
-    });
+    const res = await fetch(
+      `${API_BASE_URL}/practice-sessions/${id}/agent/start`,
+      {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ interviewerIndex }),
+      },
+    );
     const data = await res.json();
     return data.agent || null;
   } catch (err) {
-    console.error('Error starting agent:', err);
+    console.error("Error starting agent:", err);
     return null;
   }
 }
 
 export async function stopSessionAgent(id: string): Promise<any> {
   try {
-    const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/agent/stop`, {
-      method: 'POST',
-      headers: authHeaders(),
-    });
+    const res = await fetch(
+      `${API_BASE_URL}/practice-sessions/${id}/agent/stop`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+      },
+    );
     const data = await res.json();
     return data;
   } catch (err) {
-    console.error('Error stopping agent:', err);
+    console.error("Error stopping agent:", err);
     return null;
   }
 }
@@ -812,20 +915,30 @@ export interface DatasetPlanItem {
   level: string;
   difficulty: string;
   evaluationAreas: string[];
-  rounds: Array<{ name: string; type: string; durationMinutes?: number; focusAreas: string[]; sampleQuestions: string[] }>;
+  rounds: Array<{
+    name: string;
+    type: string;
+    durationMinutes?: number;
+    focusAreas: string[];
+    sampleQuestions: string[];
+  }>;
 }
 
-export async function fetchDataset(params: { company?: string; role?: string; level?: string }): Promise<DatasetPlanItem[]> {
+export async function fetchDataset(params: {
+  company?: string;
+  role?: string;
+  level?: string;
+}): Promise<DatasetPlanItem[]> {
   try {
     const url = new URL(`${API_BASE_URL}/dataset`);
-    if (params.company) url.searchParams.append('company', params.company);
-    if (params.role) url.searchParams.append('role', params.role);
-    if (params.level) url.searchParams.append('level', params.level);
+    if (params.company) url.searchParams.append("company", params.company);
+    if (params.role) url.searchParams.append("role", params.role);
+    if (params.level) url.searchParams.append("level", params.level);
     const res = await fetch(url.toString(), { headers: authHeaders() });
     const data = await res.json();
     return data.dataset || [];
   } catch (err) {
-    console.error('Error fetching dataset:', err);
+    console.error("Error fetching dataset:", err);
     return [];
   }
 }

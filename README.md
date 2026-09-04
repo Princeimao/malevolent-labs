@@ -1,159 +1,71 @@
-# Turborepo starter
+# Agora Interview — AI Interview Simulator Platform
 
-This Turborepo starter is maintained by the Turborepo core team.
+A platform where candidates **practice the interview they're actually preparing for** — real, multi-round, live-video interviews run by adaptive AI interviewers — and where contributors **build and share** those interviews with the community.
 
-## Using this example
+## What it does
 
-Run the following command:
+### For candidates
+- **Give an interview from a job description** — paste any JD plus company + role, and the AI builds a matching multi-round interview for you (no public interview needed).
+- **Round-by-round progression** — like a real loop, you pass a round to unlock the next one, or get honest feedback on what to improve.
+- **Live voice/video interviews** — join an Agora RTC room and talk directly to AI interviewer agents powered by Google Gemini (each agent has its own name, role, personality, and system prompt).
+- **Personal preparation goals** — e.g. "prepare for Google SDE". The AI generates the whole structure (how many rounds, what each covers, who interviews) and tracks your progress.
+- **Scorecards** — AI hiring-committee evaluation with per-metric feedback, strengths/weaknesses, and round-by-round verdicts.
+- **Share your passed interview** to the community feed (optional, with permission) so others can practice the same loop.
 
-```sh
-npx create-turbo@latest
+### For contributors
+Two contributor roles (opt-in from the header — candidates stay focused on practicing):
+- **Interview Creator** — creates interviewer agents (system prompts, personality, behavior), assembles interview loops round-by-round (with searchable questions from the community question database), and publishes them publicly. The best loops rise to the top through community up/down votes and ratings.
+- **Experience Sharer** — writes a full rich-text story of a real interview (format, duration, how it felt, how many people sat in, every question remembered) using a structured editor, and publishes it to the feed with comments and voting. Shared questions feed the community question database.
+
+## Monorepo layout
+
+```
+apps/
+  frontend   Next.js 16 (App Router) + Tailwind CSS v4 + shadcn/ui
+  api        Express 5 + TypeScript REST API
 ```
 
-## What's inside?
+Managed with **Turborepo** (npm workspaces).
 
-This Turborepo includes the following packages/apps:
+## Tech stack
 
-### Apps and Packages
+| Layer | Technology |
+| --- | --- |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS v4, shadcn/ui (Base UI style) |
+| Motion / UI | motion (Framer Motion), Aceternity-style three.js globe, lucide icons |
+| State | Redux Toolkit, react-hook-form + zod |
+| Backend | Node.js, Express 5, TypeScript |
+| AI | Google Gemini (`@google/genai`) — structure generation, adaptive interviewer replies, evaluation, experience parsing |
+| Live video/voice | Agora RTC (Web SDK) + Agora Conversational AI Agents (Agent Tools) |
+| Data | Prisma 8 / ORM contract (PostgreSQL) with in-memory fallback + curated interview dataset; seeding on boot |
+| Community | votes, comments, ratings, question database (in-memory stores) |
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `@next/eslint-plugin-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+## Getting started
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+```bash
+npm install
 
-### Utilities
+# API (http://localhost:5000)
+cd apps/api
+cp .env.example .env    # add GEMINI_API_KEY + Agora keys (see below)
+npm run dev
 
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+# Frontend (http://localhost:3000)
+cd apps/frontend
+npm run dev
 ```
 
-Without global `turbo`, use your package manager:
+### Environment (`.env` in `apps/api`)
+- `GEMINI_API_KEY` — turns every generation (goals, quick interviews, replies, scorecards, parsing) from heuristic to **real LLM**.
+- `AGORA_APP_ID` + `AGORA_APP_CERTIFICATE` — signs RTC tokens for live rooms.
+- `AGORA_CUSTOMER_ID` + `AGORA_CUSTOMER_SECRET` — enables **live voice interviewers** via the Agora Conversational AI Agents REST API (agents join the room and talk to you directly). Without these, agents run in a simulated/dev mode.
+- `DATABASE_URL` — optional PostgreSQL; without it the API runs on in-memory stores seeded from the curated dataset.
+- `JWT_SECRET` — auth signing key.
 
-```sh
-cd my-turborepo
-npx turbo build
-npm exec turbo build
-npm exec turbo build
-```
+## Key flows
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+1. **Onboard** (email + password, no OAuth) → set role, experience, target company/role, interview types.
+2. **Candidate**: create a goal or paste a JD → AI shows the structure → start round 1 → talk to AI interviewers in the live room → pass rounds to progress → get your scorecard → optionally share to the feed.
+3. **Contributor**: enable from the header → build agents & publish interviews, or write your experience story → the community practices, votes, rates, and comments.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-npm exec turbo build --filter=docs
-npm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-npm exec turbo dev
-npm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-npm exec turbo dev --filter=web
-npm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-npm exec turbo login
-npm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-npm exec turbo link
-npm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+> Interview data is curated/dataset + contributor-driven today; a live web scraper can be swapped in behind the dataset lookup without touching the rest of the system.

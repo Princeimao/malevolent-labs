@@ -12,6 +12,8 @@ model User {
   interviewTypes  String?  // JSON string array e.g. ["System Design", "Coding"]
   experienceLevel String?  // e.g. "Mid-Senior"
   isOnboarded     Boolean  @default(false)
+  isContributor   Boolean  @default(false)
+  contributorType String?  // e.g. "creator", "sharer", "both"
   posts           Post[]
   createdAt       TimestamptzString @default(now())
   updatedAt       temporal.updatedAtString()

@@ -12,7 +12,6 @@ import {
   Star,
 } from "lucide-react";
 
-import AppHeader from "@/components/app/AppHeader";
 import {
   fetchInterviewTemplates,
   voteInterviewTemplate,
@@ -64,15 +63,17 @@ export default function InterviewsPage() {
         t.rounds.some((r) => r.name.toLowerCase().includes(q))
       );
     })
-    .sort((a, b) => (b.votesUp - b.votesDown) - (a.votesUp - a.votesDown));
+    .sort((a, b) => b.votesUp - b.votesDown - (a.votesUp - a.votesDown));
 
   const handleVote = async (template: InterviewTemplate, dir: 1 | -1) => {
     const res = await voteInterviewTemplate(template.id, dir);
     if (res) {
       setTemplates((prev) =>
         prev.map((t) =>
-          t.id === template.id ? { ...t, votesUp: res.votesUp, votesDown: res.votesDown } : t
-        )
+          t.id === template.id
+            ? { ...t, votesUp: res.votesUp, votesDown: res.votesDown }
+            : t,
+        ),
       );
     }
   };
@@ -90,21 +91,19 @@ export default function InterviewsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans pb-24">
-      <AppHeader />
-
+    <div className="min-h-screen bg-paper text-ink font-sans pb-24">
       <main className="max-w-6xl mx-auto px-4 md:px-6 pt-8 space-y-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-neutral-800 pb-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-neutral-200 pb-6">
           <div>
             <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
               Community Library
             </span>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white mt-1">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-ink mt-1">
               Community interviews
             </h1>
-            <p className="text-neutral-400 text-sm mt-1">
-              Full interview loops built by contributors — search by company, role,
-              or level, and practice the ones the community rates highest.
+            <p className="text-neutral-500 text-sm mt-1">
+              Full interview loops built by contributors — search by company,
+              role, or level, and practice the ones the community rates highest.
             </p>
           </div>
         </div>
@@ -117,11 +116,14 @@ export default function InterviewsPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search interviews, companies, roles, rounds..."
-              className="bg-neutral-900 border-neutral-800 pl-10 text-white placeholder:text-neutral-600"
+              className="bg-paper border-neutral-200 pl-10 text-ink placeholder:text-neutral-400"
             />
           </div>
-          <Select value={level} onValueChange={(v) => setLevel(v || "All levels")}>
-            <SelectTrigger className="w-full sm:w-44 bg-neutral-900 border-neutral-800 text-white">
+          <Select
+            value={level}
+            onValueChange={(v) => setLevel(v || "All levels")}
+          >
+            <SelectTrigger className="w-full sm:w-44 bg-paper border-neutral-200 text-ink">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -139,15 +141,15 @@ export default function InterviewsPage() {
             <Loader2 className="size-6 animate-spin text-neutral-500" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-20 text-center space-y-3 rounded-2xl border border-dashed border-neutral-800">
+          <div className="py-20 text-center space-y-3 rounded-2xl border border-dashed border-neutral-200">
             <Users className="size-8 text-neutral-600 mx-auto" />
-            <p className="text-neutral-400 text-xs">
+            <p className="text-neutral-500 text-xs">
               {templates.length === 0
                 ? "No community interviews published yet."
                 : "No interviews match your filters."}
             </p>
             {templates.length === 0 && (
-              <p className="text-neutral-600 text-xs max-w-sm mx-auto">
+              <p className="text-neutral-400 text-xs max-w-sm mx-auto">
                 Interviews are built by contributors. When someone publishes a
                 loop, it appears here for everyone to practice.
               </p>
@@ -161,14 +163,14 @@ export default function InterviewsPage() {
               return (
                 <div
                   key={template.id}
-                  className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 transition-colors hover:border-neutral-700"
+                  className="rounded-2xl border border-neutral-200 bg-white p-5 transition-colors hover:border-neutral-300"
                 >
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                     {/* Vote column */}
                     <div className="flex sm:flex-col items-center gap-1 sm:gap-0 shrink-0">
                       <button
                         onClick={() => handleVote(template, 1)}
-                        className="p-1.5 rounded-lg text-neutral-400 hover:text-emerald-400 transition-colors"
+                        className="p-1.5 rounded-lg text-neutral-400 hover:text-emerald-600 transition-colors"
                         title="Upvote"
                       >
                         <ArrowUp className="size-5" />
@@ -176,17 +178,17 @@ export default function InterviewsPage() {
                       <span
                         className={`text-sm font-bold tabular-nums ${
                           netVotes > 0
-                            ? "text-emerald-400"
+                            ? "text-emerald-600"
                             : netVotes < 0
-                              ? "text-rose-400"
-                              : "text-neutral-400"
+                              ? "text-rose-500"
+                              : "text-neutral-500"
                         }`}
                       >
                         {netVotes}
                       </span>
                       <button
                         onClick={() => handleVote(template, -1)}
-                        className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-400 transition-colors"
+                        className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-500 transition-colors"
                         title="Downvote"
                       >
                         <ArrowDown className="size-5" />
@@ -196,23 +198,33 @@ export default function InterviewsPage() {
                     {/* Content */}
                     <div className="flex-1 min-w-0 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-base font-bold text-white">{template.title}</h2>
-                        <Badge variant="outline" className="border-neutral-700 text-neutral-300">
+                        <h2 className="text-base font-bold text-ink">
+                          {template.title}
+                        </h2>
+                        <Badge
+                          variant="outline"
+                          className="border-neutral-300 text-neutral-600"
+                        >
                           {template.level}
                         </Badge>
                         <span className="flex items-center gap-1 text-xs text-neutral-400">
                           <Star className="size-3.5 fill-amber-400 text-amber-400" />
                           {rating ? rating.toFixed(1) : "—"}
-                          <span className="text-neutral-600">({template.ratingCount})</span>
+                          <span className="text-neutral-600">
+                            ({template.ratingCount})
+                          </span>
                         </span>
                       </div>
 
-                      <p className="text-sm text-neutral-300">
+                      <p className="text-sm text-neutral-600">
                         {template.company} · {template.role}
-                        <span className="text-neutral-500"> · by {template.ownerName}</span>
+                        <span className="text-neutral-400">
+                          {" "}
+                          · by {template.ownerName}
+                        </span>
                       </p>
 
-                      <p className="text-xs text-neutral-400 leading-relaxed line-clamp-2">
+                      <p className="text-xs text-neutral-500 leading-relaxed line-clamp-2">
                         {template.description ||
                           `A ${template.company} ${template.role} practice loop.`}
                       </p>
@@ -221,7 +233,7 @@ export default function InterviewsPage() {
                         {template.rounds.map((r, idx) => (
                           <span
                             key={r.id}
-                            className="px-2 py-0.5 rounded-md bg-neutral-950 border border-neutral-800 text-[10px] text-neutral-400"
+                            className="px-2 py-0.5 rounded-md bg-neutral-100 border border-neutral-200 text-[10px] text-neutral-500"
                           >
                             {idx + 1}. {r.name}
                           </span>
@@ -243,7 +255,7 @@ export default function InterviewsPage() {
                         )}
                         Practice
                       </Button>
-                      <span className="text-[10px] text-neutral-600">
+                      <span className="text-[10px] text-neutral-400">
                         {template.views} views · {template.rounds.length} rounds
                       </span>
                     </div>

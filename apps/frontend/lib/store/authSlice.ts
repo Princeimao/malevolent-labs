@@ -1,7 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import axios from "axios";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000/api";
 
 export interface User {
   id: number | string;
@@ -30,16 +31,34 @@ export interface AuthState {
 
 const getInitialToken = (key: string): string | null => {
   if (typeof window !== "undefined") {
-    return localStorage.getItem(key) || (key === "accessToken" ? localStorage.getItem("agora_interview_token") : null);
+    return (
+      localStorage.getItem(key) ||
+      (key === "accessToken"
+        ? localStorage.getItem("agora_interview_token")
+        : null)
+    );
+  }
+  return null;
+};
+
+const getInitialUser = (): User | null => {
+  if (typeof window !== "undefined") {
+    try {
+      const cached = localStorage.getItem("agora_user_cache");
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
   }
   return null;
 };
 
 const initialAccessToken = getInitialToken("accessToken");
 const initialRefreshToken = getInitialToken("refreshToken");
+const initialUser = getInitialUser();
 
 const initialState: AuthState = {
-  user: null,
+  user: initialUser,
   accessToken: initialAccessToken,
   refreshToken: initialRefreshToken,
   isAuthenticated: Boolean(initialAccessToken),
@@ -53,7 +72,12 @@ export const fetchCurrentUser = createAsyncThunk(
   async (_, { getState, dispatch, rejectWithValue }) => {
     try {
       const state = getState() as { auth: AuthState };
-      const token = state.auth.accessToken || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || localStorage.getItem("agora_interview_token") : null);
+      const token =
+        state.auth.accessToken ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("accessToken") ||
+            localStorage.getItem("agora_interview_token")
+          : null);
 
       if (!token) {
         dispatch(setInitialized());
@@ -69,78 +93,117 @@ export const fetchCurrentUser = createAsyncThunk(
       }
       return rejectWithValue(response.data.error || "Failed to fetch user");
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.error || err.message || "Failed to fetch user");
+      return rejectWithValue(
+        err.response?.data?.error || err.message || "Failed to fetch user",
+      );
     }
-  }
+  },
 );
 
 export const loginUser = createAsyncThunk(
   "auth/loginUser",
-  async (credentials: { email: string; password: string }, { dispatch, rejectWithValue }) => {
+  async (
+    credentials: { email: string; password: string },
+    { dispatch, rejectWithValue },
+  ) => {
     try {
-      const response = await axios.post(`${BACKEND_URL}/auth/login`, credentials);
+      const response = await axios.post(
+        `${BACKEND_URL}/auth/login`,
+        credentials,
+      );
       const data = response.data;
       if (data.success) {
         const token = data.accessToken || data.token;
-        dispatch(setTokens({ accessToken: token, refreshToken: data.refreshToken || null }));
+        dispatch(
+          setTokens({
+            accessToken: token,
+            refreshToken: data.refreshToken || null,
+          }),
+        );
         dispatch(setUser(data.user));
         return data;
       }
       return rejectWithValue(data.error || "Login failed");
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.error || err.message || "Login failed");
+      return rejectWithValue(
+        err.response?.data?.error || err.message || "Login failed",
+      );
     }
-  }
+  },
 );
 
 export const signupUser = createAsyncThunk(
   "auth/signupUser",
-  async (credentials: { email: string; password: string; name?: string }, { dispatch, rejectWithValue }) => {
+  async (
+    credentials: { email: string; password: string; name?: string },
+    { dispatch, rejectWithValue },
+  ) => {
     try {
-      const response = await axios.post(`${BACKEND_URL}/auth/signup`, credentials);
+      const response = await axios.post(
+        `${BACKEND_URL}/auth/signup`,
+        credentials,
+      );
       const data = response.data;
       if (data.success) {
         const token = data.accessToken || data.token;
-        dispatch(setTokens({ accessToken: token, refreshToken: data.refreshToken || null }));
+        dispatch(
+          setTokens({
+            accessToken: token,
+            refreshToken: data.refreshToken || null,
+          }),
+        );
         dispatch(setUser(data.user));
         return data;
       }
       return rejectWithValue(data.error || "Signup failed");
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.error || err.message || "Signup failed");
+      return rejectWithValue(
+        err.response?.data?.error || err.message || "Signup failed",
+      );
     }
-  }
+  },
 );
 
 export const setContributorMode = createAsyncThunk(
   "auth/setContributorMode",
-  async (type: "creator" | "sharer" | "none", { getState, dispatch, rejectWithValue }) => {
+  async (
+    type: "creator" | "sharer" | "both" | "none",
+    { getState, dispatch, rejectWithValue },
+  ) => {
     try {
       const state = getState() as { auth: AuthState };
       const token =
         state.auth.accessToken ||
         (typeof window !== "undefined"
-          ? localStorage.getItem("accessToken") || localStorage.getItem("agora_interview_token")
+          ? localStorage.getItem("accessToken") ||
+            localStorage.getItem("agora_interview_token")
           : null);
 
       const response = await axios.post(
         `${BACKEND_URL}/auth/contributor`,
         { type },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       if (response.data.success && response.data.user) {
         dispatch(setUser(response.data.user));
         return response.data.user as User;
       }
-      return rejectWithValue(response.data.error || "Failed to update contributor mode");
+      return rejectWithValue(
+        response.data.error || "Failed to update contributor mode",
+      );
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.error || err.message || "Failed to update contributor mode");
+      return rejectWithValue(
+        err.response?.data?.error ||
+          err.message ||
+          "Failed to update contributor mode",
+      );
     }
-  }
+  },
 );
 
-export const completeOnboarding = createAsyncThunk(  "auth/completeOnboarding",
+export const completeOnboarding = createAsyncThunk(
+  "auth/completeOnboarding",
   async (
     payload: {
       currentRole: string;
@@ -150,15 +213,24 @@ export const completeOnboarding = createAsyncThunk(  "auth/completeOnboarding",
       experienceLevel: string;
       weeklyGoal?: string;
     },
-    { getState, dispatch, rejectWithValue }
+    { getState, dispatch, rejectWithValue },
   ) => {
     try {
       const state = getState() as { auth: AuthState };
-      const token = state.auth.accessToken || (typeof window !== "undefined" ? localStorage.getItem("accessToken") || localStorage.getItem("agora_interview_token") : null);
+      const token =
+        state.auth.accessToken ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("accessToken") ||
+            localStorage.getItem("agora_interview_token")
+          : null);
 
-      const response = await axios.post(`${BACKEND_URL}/auth/onboarding`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.post(
+        `${BACKEND_URL}/auth/onboarding`,
+        payload,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (response.data.success && response.data.user) {
         dispatch(setUser(response.data.user));
@@ -166,9 +238,11 @@ export const completeOnboarding = createAsyncThunk(  "auth/completeOnboarding",
       }
       return rejectWithValue(response.data.error || "Onboarding failed");
     } catch (err: any) {
-      return rejectWithValue(err.response?.data?.error || err.message || "Onboarding failed");
+      return rejectWithValue(
+        err.response?.data?.error || err.message || "Onboarding failed",
+      );
     }
-  }
+  },
 );
 
 export const logoutUser = createAsyncThunk(
@@ -179,7 +253,7 @@ export const logoutUser = createAsyncThunk(
     } finally {
       dispatch(clearAuth());
     }
-  }
+  },
 );
 
 const authSlice = createSlice({
@@ -188,7 +262,10 @@ const authSlice = createSlice({
   reducers: {
     setTokens: (
       state,
-      action: PayloadAction<{ accessToken: string; refreshToken?: string | null }>
+      action: PayloadAction<{
+        accessToken: string;
+        refreshToken?: string | null;
+      }>,
     ) => {
       const { accessToken, refreshToken } = action.payload;
       state.accessToken = accessToken;
@@ -213,11 +290,25 @@ const authSlice = createSlice({
       }
     },
     setUser: (state, action: PayloadAction<User | null>) => {
-      state.user = action.payload;
+      // Merge with existing user to preserve fields like isOnboarded that
+      // may not be returned by partial-update endpoints (e.g. contributor toggle)
+      const updated = action.payload
+        ? { ...state.user, ...action.payload }
+        : null;
+      state.user = updated;
       state.isAuthenticated = Boolean(action.payload || state.accessToken);
+
+      if (typeof window !== "undefined") {
+        if (updated) {
+          localStorage.setItem("agora_user_cache", JSON.stringify(updated));
+        } else {
+          localStorage.removeItem("agora_user_cache");
+        }
+      }
     },
     setInitialized: (state, action: PayloadAction<boolean | void>) => {
-      state.isInitialized = action.payload !== undefined ? Boolean(action.payload) : true;
+      state.isInitialized =
+        action.payload !== undefined ? Boolean(action.payload) : true;
       state.loading = false;
     },
     clearAuth: (state) => {
@@ -233,6 +324,7 @@ const authSlice = createSlice({
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("agora_interview_token");
+        localStorage.removeItem("agora_user_cache");
       }
     },
   },
@@ -242,19 +334,34 @@ const authSlice = createSlice({
       .addCase(fetchCurrentUser.pending, (state) => {
         state.loading = true;
       })
-      .addCase(fetchCurrentUser.fulfilled, (state, action: PayloadAction<User>) => {
-        state.user = action.payload;
-        state.isAuthenticated = true;
-        state.isInitialized = true;
-        state.loading = false;
-        state.error = null;
-      })
+      .addCase(
+        fetchCurrentUser.fulfilled,
+        (state, action: PayloadAction<User>) => {
+          const merged: User = {
+            ...state.user,
+            ...action.payload,
+            isContributor:
+              action.payload.isContributor ?? state.user?.isContributor ?? false,
+            contributorType:
+              action.payload.contributorType || state.user?.contributorType || null,
+          };
+          state.user = merged;
+          state.isAuthenticated = true;
+          state.isInitialized = true;
+          state.loading = false;
+          state.error = null;
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem("agora_user_cache", JSON.stringify(merged));
+          }
+        },
+      )
       .addCase(fetchCurrentUser.rejected, (state, action) => {
         state.user = null;
         state.isAuthenticated = false;
         state.isInitialized = true;
         state.loading = false;
-        state.error = action.payload as string || null;
+        state.error = (action.payload as string) || null;
       })
       // loginUser
       .addCase(loginUser.pending, (state) => {
@@ -267,7 +374,7 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string || "Login failed";
+        state.error = (action.payload as string) || "Login failed";
       })
       // signupUser
       .addCase(signupUser.pending, (state) => {
@@ -280,10 +387,11 @@ const authSlice = createSlice({
       })
       .addCase(signupUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string || "Signup failed";
+        state.error = (action.payload as string) || "Signup failed";
       });
   },
 });
 
-export const { setTokens, setUser, setInitialized, clearAuth } = authSlice.actions;
+export const { setTokens, setUser, setInitialized, clearAuth } =
+  authSlice.actions;
 export default authSlice.reducer;

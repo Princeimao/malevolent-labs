@@ -1,12 +1,13 @@
 import express from 'express';
 import { InterviewOrchestrator, InterviewBlueprint, ConversationTurn, FinalEvaluation, RoundBlueprint, Persona } from './services/orchestrator';
-import { generateAgoraToken } from './services/agoraService';
-import { requireAuth, getTokenUser } from './middleware';
-import { addFeedExperience, feedStore } from './services/feedStore';
-import { SeedExperience } from './data/seedFeed';
-import { indexQuestionsFromLists, indexExperienceQuestions } from './services/questionStore';
-import { startInterviewerAgent, stopAIAgent } from './services/agoraService';
-import { INTERVIEW_DATASET } from './data/interviewDataset';
+import { generateAgoraToken } from './services/agoraService.js';
+import { requireAuth, getTokenUser } from './middleware.js';
+import { addFeedExperience, feedStore } from './services/feedStore.js';
+import { SeedExperience } from './data/seedFeed.js';
+import { indexQuestionsFromLists, indexExperienceQuestions, searchQuestions } from './services/questionStore.js';
+import { startInterviewerAgent, stopAIAgent } from './services/agoraService.js';
+import { INTERVIEW_DATASET, findDatasetInterview } from './data/interviewDataset.js';
+import * as ai from './services/aiService.js';
 
 // ---------------------------------------------------------------------------
 // In-memory domain stores (PostgreSQL persistence is optional / fallback)
@@ -221,6 +222,112 @@ function buildSession(userId: number, opts: { sourceType: 'goal' | 'template' | 
   practiceStore.push(session);
   return session;
 }
+
+// ---------------------------------------------------------------------------
+// AI (Gemini) grounding + conversion helpers
+// ---------------------------------------------------------------------------
+
+function summarizeDataset(company: string, role: string): string {
+  const match = findDatasetInterview(company, role);
+  const picks = match ? [match] : INTERVIEW_DATASET.slice(0, 2);
+  return picks
+    .map((d) =>
+      [
+        `${d.company} · ${d.role} (${d.level})`,
+        ...d.rounds.map(
+          (r) =>
+            `  - ${r.name} (${r.type}, ~${r.durationMinutes || 45}min): ${r.focusAreas.join(', ')} | Q: ${r.sampleQuestions.slice(0, 3).join(' / ')}`
+        ),
+      ].join('\n')
+    )
+    .join('\n');
+}
+
+function summarizeCommunity(company: string, role: string): string {
+  const tokens = `${company} ${role}`.toLowerCase();
+  const experiences = feedStore
+    .filter((i) => {
+      const hay = `${i.company} ${i.role}`.toLowerCase();
+      return company && role ? hay.includes(company.toLowerCase()) || hay.includes(role.toLowerCase()) : true;
+    })
+    .slice(0, 3)
+    .map((i) => `${i.company} · ${i.role} — rounds: ${(i.rounds || []).map((r) => r.name).join(', ') || 'n/a'}; sample Q: ${(i.rounds || [])[0]?.sampleQuestions?.slice(0, 2).join(' / ') || 'n/a'}`)
+    .join('\n');
+  void tokens;
+  const questions = searchQuestions({ q: role || company, limit: 6 })
+    .map((q) => `- ${q.text}`)
+    .join('\n');
+  return [experiences, questions].filter(Boolean).join('\n');
+}
+
+function aiBlueprint(company: string, role: string, level: string | undefined, s: ai.AiStructure): InterviewBlueprint {
+  const evaluationCriteria = ['Technical Ability', 'Problem Solving', 'Communication', 'Behavioral'];
+  return {
+    company: company || 'General',
+    role: role || 'Software Engineer',
+    level: level || 'Mid-Senior',
+    candidateName: 'Candidate',
+    resumeHighlights: ['Profile from AI-structured generation'],
+    evaluationCriteria,
+    rounds: s.rounds.map((r, idx) => {
+      const type = (['RECRUITER', 'TECHNICAL', 'PANEL', 'HIRING_MANAGER', 'CODING'].includes(r.type) ? r.type : 'TECHNICAL') as RoundBlueprint['type'];
+      const interviewers = (r.interviewers || []).length
+        ? (r.interviewers || []).map((iv, pIdx) => ({
+            id: `p-${idx + 1}-${pIdx + 1}`,
+            name: iv.name || `Interviewer ${pIdx + 1}`,
+            role: iv.role || (type === 'RECRUITER' ? 'Recruiter' : 'Interviewer'),
+            avatarUrl: AVATARS[(idx + pIdx) % AVATARS.length],
+            personality: iv.personality || 'Professional and adaptive',
+            style: iv.style || (type === 'RECRUITER' ? 'Conversational' : 'Deep-dive technical'),
+            focusAreas: (iv.focusAreas && iv.focusAreas.length ? iv.focusAreas : r.focusAreas),
+          }))
+        : [{
+            id: `p-${idx + 1}-1`,
+            name: type === 'RECRUITER' ? 'Avery Grant' : 'Jordan Ellis',
+            role: type === 'RECRUITER' ? 'Recruiter' : type === 'HIRING_MANAGER' ? 'Hiring Manager' : 'Staff Engineer',
+            avatarUrl: AVATARS[idx % AVATARS.length],
+            personality: 'Professional, structured, and adaptive',
+            style: type === 'RECRUITER' ? 'Conversational' : 'Deep-dive technical',
+            focusAreas: r.focusAreas,
+          }];
+      return {
+        id: `round-${idx + 1}`,
+        name: r.name,
+        type,
+        interviewers,
+        focusAreas: (r.focusAreas || []).length ? r.focusAreas : ['Core competency'],
+        sampleQuestions: (r.sampleQuestions || []).length ? r.sampleQuestions : ['Tell me about a recent project and the hardest problem you solved.'],
+      };
+    }),
+  };
+}
+
+function goalFromStructure(g: Goal, s: ai.AiStructure): Goal {
+  const rounds = s.rounds.map((r, idx) => ({
+    id: `round-${idx + 1}`,
+    name: r.name,
+    type: (['RECRUITER', 'TECHNICAL', 'PANEL', 'HIRING_MANAGER', 'CODING'].includes(r.type) ? r.type : 'TECHNICAL') as RoundBlueprint['type'],
+    interviewers: (r.interviewers || []).map((iv, pIdx) => ({
+      id: `p-${idx + 1}-${pIdx + 1}`,
+      name: iv.name || `Interviewer ${pIdx + 1}`,
+      role: iv.role || 'Interviewer',
+      avatarUrl: AVATARS[(idx + pIdx) % AVATARS.length],
+      personality: iv.personality || 'Professional and adaptive',
+      style: iv.style || 'Adaptive',
+      focusAreas: iv.focusAreas?.length ? iv.focusAreas : r.focusAreas,
+    })),
+    focusAreas: r.focusAreas || [],
+    sampleQuestions: r.sampleQuestions || [],
+  }));
+  return {
+    ...g,
+    plan: s.plan || g.plan,
+    rounds,
+    totalRounds: rounds.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Round evaluation heuristic
@@ -460,7 +567,7 @@ export function registerPlatformRoutes(app: express.Express) {
   });
 
   // ---- Goals ---------------------------------------------------------------
-  app.post('/api/goals', requireAuth, (req, res) => {
+  app.post('/api/goals', requireAuth, async (req, res) => {
     try {
       const user = getTokenUser(req);
       const { title, company, role, level, notes } = req.body;
@@ -469,13 +576,26 @@ export function registerPlatformRoutes(app: express.Express) {
       }
 
       const companyName = company || 'General';
-      // AI-generated structure
-      const blueprint = InterviewOrchestrator.generateBlueprint({
+      let blueprint = InterviewOrchestrator.generateBlueprint({
         company: companyName,
         role,
         jobDescription: notes,
         resumeText: notes,
       });
+
+      // LLM-first: ground in dataset + community knowledge, then generate a
+      // bespoke structure from Gemini when a key is configured.
+      const structure = await ai.generateStructure({
+        company: companyName,
+        role,
+        level,
+        notes,
+        datasetSummary: summarizeDataset(companyName, role),
+        communitySummary: summarizeCommunity(companyName, role),
+      });
+      if (structure && structure.rounds.length) {
+        blueprint = aiBlueprint(companyName, role, level, structure);
+      }
 
       const goal: Goal = {
         id: id('goal'),
@@ -484,15 +604,16 @@ export function registerPlatformRoutes(app: express.Express) {
         company: companyName,
         role,
         level: level || blueprint.level || 'Mid-Senior',
-        plan: generatePlanText(companyName, role, blueprint.rounds),
+        plan: structure?.plan || generatePlanText(companyName, role, blueprint.rounds),
         rounds: blueprint.rounds,
         status: 'active',
         completedRounds: 0,
         totalRounds: blueprint.rounds.length,
         createdAt: new Date().toISOString(),
       };
-      goalStore.unshift(goal);
-      res.json({ success: true, goal });
+      const finalGoal = structure && structure.rounds.length ? goalFromStructure(goal, structure) : goal;
+      goalStore.unshift(finalGoal);
+      res.json({ success: true, goal: finalGoal, ai: ai.aiEnabled() });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -522,10 +643,10 @@ export function registerPlatformRoutes(app: express.Express) {
   });
 
   // ---- Practice Sessions ---------------------------------------------------
-  app.post('/api/practice-sessions', requireAuth, (req, res) => {
+  app.post('/api/practice-sessions', requireAuth, async (req, res) => {
     try {
       const user = getTokenUser(req);
-      const { goalId, templateId, company, role, resumeText, githubUrl, candidateName } = req.body;
+      const { goalId, templateId, company, role, resumeText, jobDescription, githubUrl, candidateName } = req.body;
 
       if (goalId) {
         const goal = goalStore.find((g) => g.id === goalId && g.userId === user.id);
@@ -558,15 +679,28 @@ export function registerPlatformRoutes(app: express.Express) {
         return res.json({ success: true, session });
       }
 
-      // Generic / free-form
+      // Generic / free-form (JD import, quick practice): ask Gemini to tailor a
+      // real structure from the dataset + community database before falling back.
       const companyName = company || 'General';
       const roleName = role || 'Software Engineer';
-      const blueprint = InterviewOrchestrator.generateBlueprint({
+      const notes = resumeText || jobDescription || '';
+      let blueprint = InterviewOrchestrator.generateBlueprint({
         company: companyName,
         role: roleName,
-        resumeText,
+        resumeText: notes,
         githubUrl,
       });
+
+      const structure = await ai.generateStructure({
+        company: companyName,
+        role: roleName,
+        notes,
+        datasetSummary: summarizeDataset(companyName, roleName),
+        communitySummary: summarizeCommunity(companyName, roleName),
+      });
+      if (structure && structure.rounds.length) {
+        blueprint = aiBlueprint(companyName, roleName, blueprint.level, structure);
+      }
       if (candidateName) blueprint.candidateName = candidateName;
 
       const session = buildSession(user.id, {
@@ -576,7 +710,7 @@ export function registerPlatformRoutes(app: express.Express) {
         company: companyName,
         role: roleName,
       });
-      res.json({ success: true, session });
+      res.json({ success: true, session, ai: ai.aiEnabled() });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -597,7 +731,7 @@ export function registerPlatformRoutes(app: express.Express) {
     res.json({ success: true, session });
   });
 
-  app.post('/api/practice-sessions/:id/interact', requireAuth, (req, res) => {
+  app.post('/api/practice-sessions/:id/interact', requireAuth, async (req, res) => {
     const user = getTokenUser(req);
     const session = practiceStore.find((s) => s.id === req.params.id && s.userId === user.id);
     if (!session) return res.status(404).json({ success: false, error: 'Practice session not found' });
@@ -621,6 +755,22 @@ export function registerPlatformRoutes(app: express.Express) {
       transcripts: session.transcripts,
       latestCandidateInput: candidateInput || '',
     });
+
+    // LLM-first replies: let Gemini speak as the active interviewer.
+    if (ai.aiEnabled() && turnResult.activeInterviewer) {
+      const round = session.blueprint.rounds[session.currentRoundIndex];
+      const aiReply = await ai.interviewerReply({
+        interviewer: turnResult.activeInterviewer,
+        round,
+        company: session.company,
+        targetRole: session.role,
+        resumeHighlights: session.blueprint.resumeHighlights,
+        history: session.transcripts.slice(-12).map((t) => ({ sender: t.sender, name: t.interviewerName, text: t.text })),
+        lastCandidateAnswer: candidateInput || '',
+      });
+      if (aiReply) turnResult.nextTurn.text = aiReply;
+    }
+
     session.transcripts.push(turnResult.nextTurn);
 
     res.json({
@@ -629,6 +779,7 @@ export function registerPlatformRoutes(app: express.Express) {
       activeInterviewer: turnResult.activeInterviewer,
       currentRoundIndex: session.currentRoundIndex,
       transcripts: session.transcripts,
+      ai: ai.aiEnabled(),
     });
   });
 
@@ -650,12 +801,43 @@ export function registerPlatformRoutes(app: express.Express) {
     });
   });
 
-  app.post('/api/practice-sessions/:id/complete', requireAuth, (req, res) => {
+  app.post('/api/practice-sessions/:id/complete', requireAuth, async (req, res) => {
     const user = getTokenUser(req);
     const session = practiceStore.find((s) => s.id === req.params.id && s.userId === user.id);
     if (!session) return res.status(404).json({ success: false, error: 'Practice session not found' });
 
-    const evaluation = InterviewOrchestrator.generateEvaluation(session.blueprint, session.transcripts);
+    let evaluation = InterviewOrchestrator.generateEvaluation(session.blueprint, session.transcripts);
+
+    // LLM-first hiring-committee evaluation.
+    if (ai.aiEnabled()) {
+      const aiEval = await ai.evaluatePerformance({
+        company: session.company,
+        role: session.role,
+        rounds: session.blueprint.rounds.map((r) => ({ name: r.name, type: r.type, focusAreas: r.focusAreas })),
+        transcripts: session.transcripts.map((t) => ({ sender: t.sender, name: t.interviewerName, text: t.text })),
+      });
+      if (aiEval) {
+        evaluation = {
+          overallScore: aiEval.overallScore,
+          passRecommendation: aiEval.passRecommendation,
+          summary: `${session.company} ${session.role} simulation (${session.blueprint.rounds.length} rounds) — evaluated by AI hiring committee.`,
+          metrics: {
+            technicalAbility: aiEval.metrics?.technicalAbility ?? aiEval.overallScore,
+            problemSolving: aiEval.metrics?.problemSolving ?? aiEval.overallScore,
+            communication: aiEval.metrics?.communication ?? aiEval.overallScore,
+            behavioral: aiEval.metrics?.behavioral ?? aiEval.overallScore,
+            roleSpecific: aiEval.metrics?.roleSpecific ?? aiEval.overallScore,
+          },
+          strengths: aiEval.strengths || [],
+          weaknesses: aiEval.weaknesses || [],
+          improvementSuggestions: aiEval.improvementSuggestions || [],
+          struggledQuestions: [],
+          roundEvaluations: aiEval.roundEvaluations || session.blueprint.rounds.map((r) => ({ roundName: r.name, score: aiEval.overallScore, keyObservation: '', strengths: [], areasForGrowth: [] })),
+          interviewerFeedback: aiEval.interviewerFeedback || session.blueprint.rounds.flatMap((r) => r.interviewers.map((i) => ({ interviewerName: i.name, role: i.role, feedback: '', verdict: aiEval.passRecommendation ? 'Hire' : 'Weak Hire' as any }))),
+        };
+      }
+    }
+
     session.evaluation = evaluation;
     session.overallScore = evaluation.overallScore;
     session.passRecommendation = evaluation.passRecommendation;
@@ -673,7 +855,7 @@ export function registerPlatformRoutes(app: express.Express) {
       }
     }
 
-    res.json({ success: true, evaluation, session });
+    res.json({ success: true, evaluation, session, ai: ai.aiEnabled() });
   });
 
   app.post('/api/practice-sessions/:id/feed-clip', requireAuth, (req, res) => {

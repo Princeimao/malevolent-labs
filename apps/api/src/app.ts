@@ -1,4 +1,4 @@
-﻿import express from "express";
+import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -12,6 +12,7 @@ import {
 import { generateAgoraToken } from "./services/agoraService";
 import { requireAuth, getTokenUser, JWT_SECRET } from "./middleware";
 import { registerPlatformRoutes } from "./platform";
+import * as ai from "./services/aiService";
 import {
   feedStore,
   getFeedEngagement,
@@ -25,11 +26,13 @@ import {
   voteQuestionById,
   indexExperienceQuestions,
 } from "./services/questionStore";
+import morgan from "morgan";
 
 const app = express();
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(morgan("dev"));
 
 // In-memory fallback cache when PostgreSQL is initializing or running locally
 const localSessionStore: Record<string, any> = {};
@@ -101,7 +104,7 @@ app.post("/api/auth/signup", async (req, res) => {
         });
       }
 
-      const newUser = await db.orm.public.User.insert({
+      const newUser = await db.orm.public.User.create({
         email,
         passwordHash,
         name: userName,
@@ -313,22 +316,43 @@ app.get("/api/auth/me", async (req, res) => {
       const dbUser = await db.orm.public.User.where({
         email: decoded.email,
       }).first();
+      const local = localUserStore[decoded.email];
       if (dbUser) {
         userDetails = {
           id: dbUser.id,
           email: dbUser.email,
           name: dbUser.name || decoded.name,
-          currentRole: dbUser.currentRole || undefined,
-          targetCompany: dbUser.targetCompany || undefined,
-          targetRole: dbUser.targetRole || undefined,
+          currentRole: dbUser.currentRole || local?.currentRole || undefined,
+          targetCompany:
+            dbUser.targetCompany || local?.targetCompany || undefined,
+          targetRole: dbUser.targetRole || local?.targetRole || undefined,
           interviewTypes: dbUser.interviewTypes
             ? JSON.parse(dbUser.interviewTypes)
-            : [],
-          experienceLevel: dbUser.experienceLevel || undefined,
-          weeklyGoal: (dbUser as any).weeklyGoal || undefined,
-          isContributor: (dbUser as any).isContributor ?? false,
-          contributorType: (dbUser as any).contributorType || null,
-          isOnboarded: dbUser.isOnboarded ?? false,
+            : local?.interviewTypes || [],
+          experienceLevel:
+            dbUser.experienceLevel || local?.experienceLevel || undefined,
+          weeklyGoal:
+            (dbUser as any).weeklyGoal || local?.weeklyGoal || undefined,
+          isContributor:
+            (dbUser as any).isContributor || local?.isContributor || false,
+          contributorType:
+            (dbUser as any).contributorType || local?.contributorType || null,
+          isOnboarded: dbUser.isOnboarded ?? local?.isOnboarded ?? false,
+        };
+      } else if (local) {
+        userDetails = {
+          id: local.id,
+          email: local.email,
+          name: local.name,
+          currentRole: local.currentRole,
+          targetCompany: local.targetCompany,
+          targetRole: local.targetRole,
+          interviewTypes: local.interviewTypes,
+          experienceLevel: local.experienceLevel,
+          weeklyGoal: local.weeklyGoal,
+          isContributor: local.isContributor ?? false,
+          contributorType: local.contributorType ?? null,
+          isOnboarded: local.isOnboarded ?? false,
         };
       }
     } catch (e) {
@@ -427,28 +451,41 @@ app.post("/api/auth/onboarding", requireAuth, async (req, res) => {
  * full studio. Types: 'creator' (builds public interviews with agents) or
  * 'sharer' (shares real experiences). Passing 'none' disables contributor mode.
  */
-app.post("/api/auth/contributor", requireAuth, (req, res) => {
+app.post("/api/auth/contributor", requireAuth, async (req, res) => {
   try {
     const decoded = (req as any).user;
     const { type } = req.body || {};
-    const enabled = type === "creator" || type === "sharer";
+    const enabled = type === "creator" || type === "sharer" || type === "both";
     const contributorType = enabled ? type : null;
 
-    if (localUserStore[decoded.email]) {
-      localUserStore[decoded.email] = {
-        ...localUserStore[decoded.email],
-        isContributor: enabled,
-        contributorType,
-      };
+    // 1. Try DB update if user exists in database
+    try {
+      const dbUser = await db.orm.public.User.where({
+        email: decoded.email,
+      }).first();
+      if (dbUser) {
+        await db.orm.public.User.where({ id: dbUser.id }).update({
+          isContributor: enabled,
+          contributorType,
+        });
+      }
+    } catch (dbErr) {
+      // Fallback if DB table columns do not exist
     }
+
+    // 2. Persist in in-memory localUserStore (create if missing)
+    const existingLocal = localUserStore[decoded.email] || {};
+    const updatedLocal = {
+      isOnboarded: true,
+      ...existingLocal,
+      isContributor: enabled,
+      contributorType,
+    };
+    localUserStore[decoded.email] = updatedLocal;
 
     res.json({
       success: true,
-      user: {
-        ...decoded,
-        isContributor: enabled,
-        contributorType,
-      },
+      user: updatedLocal,
     });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -472,7 +509,7 @@ app.get("/api/feed", async (req, res) => {
 
     try {
       // Attempt DB query if table exists
-      const dbItems = await db.orm.public.InterviewExperience.findMany();
+      const dbItems = await db.orm.public.InterviewExperience.all();
       if (dbItems && dbItems.length > 0) {
         items = dbItems.map((item: any) => ({
           id: item.id,
@@ -620,6 +657,8 @@ app.post("/api/questions/:id/vote", (req, res) => {
 });
 
 app.post("/api/feed/:id/vote", (req, res) => {
+  const user = getTokenUser(req);
+  const userId = user?.id ? String(user.id) : user?.email || "anonymous";
   const { dir } = req.body || {};
   const item = feedStore.find((i) => i.id === req.params.id);
   if (!item)
@@ -631,7 +670,7 @@ app.post("/api/feed/:id/vote", (req, res) => {
       .status(400)
       .json({ success: false, error: "dir must be 1 (up) or -1 (down)" });
   }
-  const tally = voteFeedExperience(item.id, dir as 1 | -1);
+  const tally = voteFeedExperience(item.id, dir as 1 | -1, userId);
   res.json({
     success: true,
     engagement: { ...tally, commentCount: getFeedComments(item.id).length },
@@ -659,13 +698,19 @@ app.post("/api/feed/:id/comments", (req, res) => {
   res.json({ success: true, comment, comments: getFeedComments(item.id) });
 });
 
-app.post("/api/feed/parse", (req, res) => {
+app.post("/api/feed/parse", async (req, res) => {
   try {
     const { rawContent } = req.body;
     if (!rawContent || typeof rawContent !== "string") {
       return res
         .status(400)
         .json({ success: false, error: "rawContent is required" });
+    }
+
+    // LLM-first: parse the raw experience with Gemini, fall back to the heuristic.
+    const aiParsed = await ai.parseExperience(rawContent);
+    if (aiParsed) {
+      return res.json({ success: true, parsedData: aiParsed, ai: true });
     }
 
     // AI Parsing Logic Simulation
@@ -805,7 +850,7 @@ app.post("/api/feed/publish", async (req, res) => {
     indexExperienceQuestions(newExperience);
 
     try {
-      await db.orm.public.InterviewExperience.insert({
+      await db.orm.public.InterviewExperience.create({
         company: newExperience.company,
         role: newExperience.role,
         level: newExperience.level,

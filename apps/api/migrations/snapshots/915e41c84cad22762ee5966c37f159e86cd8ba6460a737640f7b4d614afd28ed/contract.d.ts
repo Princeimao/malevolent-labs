@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'718486f52da8684aafca17ed59dea82fe074386e24df97e817e5f9a9dd00ab27'>;
+  StorageHashBase<'915e41c84cad22762ee5966c37f159e86cd8ba6460a737640f7b4d614afd28ed'>;
 export type ExecutionHash =
   ExecutionHashBase<'986c0d376a6dc852a7cdcb31e69f485c27e739c3a3858ccee5bb80d6a003c9f1'>;
 export type ProfileHash =
@@ -304,8 +304,6 @@ export type FieldOutputTypes = {
       readonly interviewTypes: CodecTypes['pg/text@1']['output'] | null;
       readonly experienceLevel: CodecTypes['pg/text@1']['output'] | null;
       readonly isOnboarded: CodecTypes['pg/bool@1']['output'];
-      readonly isContributor: CodecTypes['pg/bool@1']['output'];
-      readonly contributorType: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
@@ -376,8 +374,6 @@ export type FieldInputTypes = {
       readonly interviewTypes: CodecTypes['pg/text@1']['input'] | null;
       readonly experienceLevel: CodecTypes['pg/text@1']['input'] | null;
       readonly isOnboarded: CodecTypes['pg/bool@1']['input'];
-      readonly isContributor: CodecTypes['pg/bool@1']['input'];
-      readonly contributorType: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
@@ -437,14 +433,12 @@ export type StorageColumnTypes = {
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['output'];
     };
     readonly user: {
-      readonly contributorType: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['output'];
       readonly currentRole: CodecTypes['pg/text@1']['output'] | null;
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly experienceLevel: CodecTypes['pg/text@1']['output'] | null;
       readonly id: CodecTypes['pg/int4@1']['output'];
       readonly interviewTypes: CodecTypes['pg/text@1']['output'] | null;
-      readonly isContributor: CodecTypes['pg/bool@1']['output'];
       readonly isOnboarded: CodecTypes['pg/bool@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'] | null;
       readonly passwordHash: CodecTypes['pg/text@1']['output'];
@@ -509,14 +503,12 @@ export type StorageColumnInputTypes = {
       readonly updatedAt: CodecTypes['pg/timestamptz-string@1']['input'];
     };
     readonly user: {
-      readonly contributorType: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-string@1']['input'];
       readonly currentRole: CodecTypes['pg/text@1']['input'] | null;
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly experienceLevel: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['pg/int4@1']['input'];
       readonly interviewTypes: CodecTypes['pg/text@1']['input'] | null;
-      readonly isContributor: CodecTypes['pg/bool@1']['input'];
       readonly isOnboarded: CodecTypes['pg/bool@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'] | null;
       readonly passwordHash: CodecTypes['pg/text@1']['input'];
@@ -929,20 +921,6 @@ type ContractBase = Omit<
                     readonly value: DefaultLiteralValue<'pg/bool@1', false>;
                   };
                 };
-                readonly isContributor: {
-                  readonly nativeType: 'bool';
-                  readonly codecId: 'pg/bool@1';
-                  readonly nullable: false;
-                  readonly default: {
-                    readonly kind: 'literal';
-                    readonly value: DefaultLiteralValue<'pg/bool@1', false>;
-                  };
-                };
-                readonly contributorType: {
-                  readonly nativeType: 'text';
-                  readonly codecId: 'pg/text@1';
-                  readonly nullable: true;
-                };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-string@1';
@@ -1328,14 +1306,6 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
               };
-              readonly isContributor: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
-              };
-              readonly contributorType: {
-                readonly nullable: true;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
-              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -1376,8 +1346,6 @@ type ContractBase = Omit<
                 readonly interviewTypes: { readonly column: 'interviewTypes' };
                 readonly experienceLevel: { readonly column: 'experienceLevel' };
                 readonly isOnboarded: { readonly column: 'isOnboarded' };
-                readonly isContributor: { readonly column: 'isContributor' };
-                readonly contributorType: { readonly column: 'contributorType' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };

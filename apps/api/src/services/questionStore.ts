@@ -1,11 +1,11 @@
-import { INITIAL_COMMUNITY_FEED } from '../data/seedFeed';
-import { feedStore } from './feedStore';
-import { SeedExperience } from '../data/seedFeed';
+import { INITIAL_COMMUNITY_FEED } from "../data/seedFeed.js";
+import { feedStore } from "./feedStore.js";
+import { SeedExperience } from "../data/seedFeed.js";
 
 export interface BankQuestion {
   id: string;
   text: string;
-  source: 'seed' | 'experience' | 'template';
+  source: "seed" | "experience" | "template";
   company?: string;
   role?: string;
   up: number;
@@ -16,10 +16,13 @@ const store: BankQuestion[] = [];
 const seen = new Map<string, BankQuestion>(); // normalized text -> question
 
 function normalize(text: string) {
-  return text.trim().toLowerCase().replace(/\s+/g, ' ');
+  return text.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function findSeededQuestions(exp: SeedExperience, source: 'seed' | 'experience') {
+function findSeededQuestions(
+  exp: SeedExperience,
+  source: "seed" | "experience",
+) {
   for (const round of exp.rounds || []) {
     for (const q of round.sampleQuestions || []) {
       indexQuestion(q, source, exp.company, exp.role);
@@ -27,14 +30,31 @@ function findSeededQuestions(exp: SeedExperience, source: 'seed' | 'experience')
   }
 }
 
-export function indexQuestion(text: string, source: BankQuestion['source'], company?: string, role?: string): BankQuestion {
-  if (!text || typeof text !== 'string') {
-    const dummy: BankQuestion = { id: 'q-empty', text: '', source, up: 0, down: 0 };
+export function indexQuestion(
+  text: string,
+  source: BankQuestion["source"],
+  company?: string,
+  role?: string,
+): BankQuestion {
+  if (!text || typeof text !== "string") {
+    const dummy: BankQuestion = {
+      id: "q-empty",
+      text: "",
+      source,
+      up: 0,
+      down: 0,
+    };
     return dummy;
   }
   const key = normalize(text);
   if (!key) {
-    const dummy: BankQuestion = { id: 'q-empty', text: '', source, up: 0, down: 0 };
+    const dummy: BankQuestion = {
+      id: "q-empty",
+      text: "",
+      source,
+      up: 0,
+      down: 0,
+    };
     return dummy;
   }
   const existing = seen.get(key);
@@ -59,34 +79,45 @@ export function indexQuestion(text: string, source: BankQuestion['source'], comp
 
 export function seedQuestionBank() {
   for (const exp of INITIAL_COMMUNITY_FEED) {
-    findSeededQuestions(exp, 'seed');
+    findSeededQuestions(exp, "seed");
   }
   for (const exp of feedStore) {
-    findSeededQuestions(exp, 'experience');
+    findSeededQuestions(exp, "experience");
   }
 }
 
 export function indexExperienceQuestions(exp: SeedExperience) {
-  findSeededQuestions(exp, 'experience');
+  findSeededQuestions(exp, "experience");
 }
 
-export function indexQuestionsFromLists(questions: string[], source: BankQuestion['source'], company?: string, role?: string) {
+export function indexQuestionsFromLists(
+  questions: string[],
+  source: BankQuestion["source"],
+  company?: string,
+  role?: string,
+) {
   for (const q of questions || []) indexQuestion(q, source, company, role);
 }
 
-export function searchQuestions(params: { q?: string; company?: string; limit?: number }): BankQuestion[] {
-  const query = (params.q || '').trim().toLowerCase();
-  const company = (params.company || '').trim().toLowerCase();
+export function searchQuestions(params: {
+  q?: string;
+  company?: string;
+  limit?: number;
+}): BankQuestion[] {
+  const query = (params.q || "").trim().toLowerCase();
+  const company = (params.company || "").trim().toLowerCase();
   let results = store;
   if (company) {
-    results = results.filter((q) => (q.company || '').toLowerCase().includes(company));
+    results = results.filter((q) =>
+      (q.company || "").toLowerCase().includes(company),
+    );
   }
   if (query) {
     results = results.filter(
       (q) =>
         q.text.toLowerCase().includes(query) ||
-        (q.company || '').toLowerCase().includes(query) ||
-        (q.role || '').toLowerCase().includes(query)
+        (q.company || "").toLowerCase().includes(query) ||
+        (q.role || "").toLowerCase().includes(query),
     );
   }
   return results
@@ -95,12 +126,15 @@ export function searchQuestions(params: { q?: string; company?: string; limit?: 
     .slice(0, params.limit || 25);
 }
 
-export function voteQuestionByText(text: string, dir: 1 | -1): BankQuestion | null {
+export function voteQuestionByText(
+  text: string,
+  dir: 1 | -1,
+): BankQuestion | null {
   const key = normalize(text);
   if (!key) return null;
   let q = seen.get(key);
   if (!q) {
-    q = indexQuestion(text.trim(), 'experience');
+    q = indexQuestion(text.trim(), "experience");
   }
   if (dir === 1) q.up += 1;
   else if (dir === -1) q.down += 1;
@@ -115,7 +149,10 @@ export function voteQuestionById(id: string, dir: 1 | -1): BankQuestion | null {
   return q;
 }
 
-export function getQuestionVotesByText(text: string): { up: number; down: number } {
+export function getQuestionVotesByText(text: string): {
+  up: number;
+  down: number;
+} {
   const q = seen.get(normalize(text));
   return q ? { up: q.up, down: q.down } : { up: 0, down: 0 };
 }

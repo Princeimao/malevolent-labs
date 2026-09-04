@@ -1,5 +1,5 @@
-import { INITIAL_COMMUNITY_FEED, SeedExperience } from '../data/seedFeed';
-import { findDatasetInterview, DatasetExperience } from '../data/interviewDataset';
+import { INITIAL_COMMUNITY_FEED, SeedExperience } from '../data/seedFeed.js';
+import { findDatasetInterview, DatasetExperience } from '../data/interviewDataset.js';
 
 export interface Persona {
   id: string;
