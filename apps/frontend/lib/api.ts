@@ -735,11 +735,14 @@ export async function createPracticeSession(payload: {
   candidateName?: string;
 }): Promise<PracticeSession> {
   const res = await fetch(`${API_BASE_URL}/practice-sessions`, {
-    method: "POST",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    method: 'POST',
+    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   const data = await res.json();
+  if (!data?.success || !data?.session) {
+    throw new Error(data?.error || 'Could not start a practice session');
+  }
   return data.session;
 }
 
@@ -874,38 +877,79 @@ export async function startSessionAgent(
   id: string,
   interviewerIndex = 0,
 ): Promise<any> {
-  try {
-    const res = await fetch(
-      `${API_BASE_URL}/practice-sessions/${id}/agent/start`,
-      {
-        method: "POST",
-        headers: { ...authHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ interviewerIndex }),
-      },
-    );
-    const data = await res.json();
-    return data.agent || null;
-  } catch (err) {
-    console.error("Error starting agent:", err);
-    return null;
-  }
+  const res = await fetch(
+    `${API_BASE_URL}/practice-sessions/${id}/agent/start`,
+    {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ interviewerIndex }),
+    },
+  );
+  const data = await res.json();
+  if (!data?.success) throw new Error(data?.error || "Failed to start interviewer agent");
+  return data.agent || null;
 }
 
 export async function stopSessionAgent(id: string): Promise<any> {
-  try {
-    const res = await fetch(
-      `${API_BASE_URL}/practice-sessions/${id}/agent/stop`,
-      {
-        method: "POST",
-        headers: authHeaders(),
-      },
-    );
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.error("Error stopping agent:", err);
-    return null;
-  }
+  const res = await fetch(
+    `${API_BASE_URL}/practice-sessions/${id}/agent/stop`,
+    {
+      method: "POST",
+      headers: authHeaders(),
+    },
+  );
+  const data = await res.json();
+  if (!data?.success) throw new Error(data?.error || "Failed to stop interviewer agent");
+  return data;
+}
+
+export interface RoundStartResult {
+  success: boolean;
+  voiceMode: "live";
+  agents: Array<{ interviewerIndex: number; interviewerName: string; taskId: string | null }>;
+  round: { id: string; name: string; type: string };
+  agora: { appId: string; channelName: string; token: string };
+}
+
+// Voice-first start: backend spins up conversational agents for the current round.
+export async function startPracticeRound(id: string): Promise<RoundStartResult> {
+  const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/start`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  const data = await res.json();
+  if (!data?.success) throw new Error(data?.error || "Failed to start the interview round");
+  return data;
+}
+
+// Speech-to-text the candidate's recorded answer (Gemini), stored as a turn.
+export async function transcribeAnswer(
+  id: string,
+  audioB64: string,
+  mimeType = "audio/webm",
+): Promise<{ text: string; transcripts: ConversationTurn[] }> {
+  const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/transcribe`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ audioB64, mimeType }),
+  });
+  const data = await res.json();
+  if (!data?.success) throw new Error(data?.error || "Speech-to-text failed");
+  return data;
+}
+
+export async function pushTranscript(
+  id: string,
+  text: string,
+): Promise<ConversationTurn[]> {
+  const res = await fetch(`${API_BASE_URL}/practice-sessions/${id}/transcript`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  const data = await res.json();
+  if (!data?.success) throw new Error(data?.error || "Failed to save transcript");
+  return data.transcripts || [];
 }
 
 export interface DatasetPlanItem {

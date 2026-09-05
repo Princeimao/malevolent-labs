@@ -41,6 +41,8 @@ import {
   contributePracticeClip,
   startSessionAgent,
   stopSessionAgent,
+  startPracticeRound,
+  transcribeAnswer,
   PracticeSession,
   PracticeRoundInfo,
   RoundResult,
@@ -85,6 +87,11 @@ export default function PracticeRoomPage() {
   const [connecting, setConnecting] = useState(false);
   const [agentBusy, setAgentBusy] = useState<number | null>(null);
   const [remoteSpeaking, setRemoteSpeaking] = useState(false);
+  const [voiceLive, setVoiceLive] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [roomError, setRoomError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   const rtcClientRef = useRef<IAgoraRTCClient | null>(null);
   const localVideoTrackRef = useRef<ICameraVideoTrack | null>(null);
@@ -96,6 +103,14 @@ export default function PracticeRoomPage() {
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
 
   const leaveChannel = useCallback(async () => {
+    setVoiceLive(false);
+    try {
+      const recorder = recorderRef.current;
+      if (recorder && recorder.state !== "inactive") recorder.stop();
+      recorderRef.current = null;
+    } catch {
+      /* noop */
+    }
     try {
       await stopSessionAgent(sessionId);
     } catch {
@@ -158,9 +173,10 @@ export default function PracticeRoomPage() {
     }
   };
 
-  const joinVideo = async () => {
-    if (!roundInfo) return;
+  const joinVideo = async (): Promise<boolean> => {
+    if (!roundInfo) return false;
     setConnecting(true);
+    setRoomError(null);
     try {
       const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
       rtcClientRef.current = client;
@@ -201,11 +217,14 @@ export default function PracticeRoomPage() {
       localAudioTrackRef.current = audioTrack;
 
       await client.publish([videoTrack, audioTrack]);
-    } catch (err) {
-      console.warn(
-        "Could not join Agora (permissions likely blocked). Text mode still works.",
-        err,
+      return true;
+    } catch (err: any) {
+      console.error("Agora join failed:", err);
+      setRoomError(
+        err?.message ||
+          "Could not join the live room. Check your microphone/camera permissions and that Agora is configured.",
       );
+      return false;
     } finally {
       setConnecting(false);
     }
@@ -254,7 +273,131 @@ export default function PracticeRoomPage() {
           }
         : prev,
     );
+    setVoiceLive(false);
     setAgentBusy(null);
+  };
+
+  // ---- voice-to-voice: record the candidate's mic for STT -------------
+  const blobToBase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(",")[1] || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+  const beginRecording = () => {
+    const track = localAudioTrackRef.current?.getMediaStreamTrack?.();
+    if (!track || !window.MediaRecorder) return;
+    chunksRef.current = [];
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(new MediaStream([track]), {
+        mimeType: MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : undefined,
+      });
+    } catch {
+      return;
+    }
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    recorder.start(1000);
+    recorderRef.current = recorder;
+    setRecording(true);
+  };
+
+  const stopRecording = async (): Promise<Blob | null> => {
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    setRecording(false);
+    if (!recorder || recorder.state === "inactive") return null;
+    const done = new Promise<Blob | null>((resolve) => {
+      recorder.onstop = () =>
+        resolve(
+          chunksRef.current.length
+            ? new Blob(chunksRef.current, { type: "audio/webm" })
+            : null,
+        );
+    });
+    recorder.stop();
+    return done;
+  };
+
+  // Backend spins up the conversational agents for this round; candidate is live.
+  const startVoiceRound = async () => {
+    setAgentBusy(-1);
+    setRoomError(null);
+    try {
+      const res = await startPracticeRound(sessionId);
+      setRoundInfo((prev) =>
+        prev
+          ? {
+              ...prev,
+              agora: res.agora,
+              speakers: prev.speakers.map((s, i) => ({
+                ...s,
+                started: res.agents.some((a) => a.interviewerIndex === i),
+              })),
+            }
+          : prev,
+      );
+      setVoiceLive(true);
+      beginRecording();
+    } catch (err: any) {
+      setVoiceLive(false);
+      setRoomError(err?.message || "Could not start your interviewer.");
+    } finally {
+      setAgentBusy(null);
+    }
+  };
+
+  // Finish the round: transcribe the candidate's mic recording (Gemini), then get
+  // a real verdict. No typing involved.
+  const handleFinishRoundVoice = async () => {
+    if (!session) return;
+    setEvaluating(true);
+    setRoomError(null);
+    try {
+      const audio = await stopRecording();
+      if (audio && audio.size > 200) {
+        const b64 = await blobToBase64(audio);
+        const res = await transcribeAnswer(session.id, b64, "audio/webm");
+        setSession((prev) =>
+          prev ? { ...prev, transcripts: res.transcripts } : prev,
+        );
+      }
+      const res = await evaluatePracticeRound(session.id);
+      setRoundResult(res.result);
+      setResultOpen(true);
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: res.sessionStatus as PracticeSession["status"],
+              currentRoundIndex: res.currentRoundIndex,
+              roundResults: res.roundResults,
+            }
+          : prev,
+      );
+      if (res.sessionStatus === "PASSED" || res.sessionStatus === "FAILED") {
+        setVoiceLive(false);
+      }
+    } catch (err: any) {
+      setRoomError(err?.message || "Could not finish the round. Please try again.");
+      setVoiceLive(true);
+      beginRecording();
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  const joinAndStart = async () => {
+    setRoomError(null);
+    const joinedOk = await joinVideo();
+    if (!joinedOk) return;
+    await startVoiceRound();
   };
 
   // ---------------------------------------------------------------- transcript flow
@@ -307,13 +450,22 @@ export default function PracticeRoomPage() {
 
   const handleContinue = async () => {
     setResultOpen(false);
-    await leaveChannel();
+    setRoomError(null);
     const r = await fetchPracticeRound(sessionId);
     setRoundInfo(r);
+    if (joined) {
+      await startVoiceRound();
+    }
   };
 
   const handleComplete = async () => {
     if (!session) return;
+    try {
+      await stopSessionAgent(session.id);
+    } catch {
+      /* already stopped */
+    }
+    setVoiceLive(false);
     const { evaluation, session: updated } = await completePracticeSession(
       session.id,
     );
@@ -657,102 +809,109 @@ export default function PracticeRoomPage() {
               </div>
             </div>
 
-            {/* Join + answer */}
+            {/* Voice interview panel */}
             {!isFinishedFlow && (
               <div className="space-y-3 rounded-2xl border border-neutral-200 bg-white p-4">
+                {roomError && (
+                  <div className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2.5 text-xs leading-relaxed text-rose-700">
+                    {roomError}
+                  </div>
+                )}
+
                 {!joined ? (
                   <Button
                     className="w-full bg-ink text-paper hover:bg-neutral-800"
-                    onClick={joinVideo}
-                    disabled={connecting}
+                    onClick={joinAndStart}
+                    disabled={connecting || agentBusy !== null}
                   >
-                    {connecting ? (
+                    {connecting || agentBusy !== null ? (
                       <Loader2 className="size-4 animate-spin" />
                     ) : (
-                      <Video className="size-4" />
+                      <Mic className="size-4" />
                     )}
-                    Join live room (camera & mic)
+                    Join & start your voice interview
                   </Button>
-                ) : (
-                  <div className="flex items-center justify-center gap-2">
+                ) : !voiceLive ? (
+                  <div className="flex flex-col items-center gap-3 py-2 text-center">
+                    <Loader2 className="size-5 animate-spin text-indigo-500" />
+                    <p className="text-xs text-neutral-500">
+                      Connecting your AI interviewer...
+                    </p>
                     <Button
                       size="icon"
                       variant="outline"
-                      className="rounded-full border-neutral-300 text-neutral-700 hover:bg-neutral-100"
-                      onClick={toggleMic}
-                    >
-                      {isMicOn ? (
-                        <Mic className="size-4" />
-                      ) : (
-                        <MicOff className="size-4 text-rose-600" />
-                      )}
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      className="rounded-full border-neutral-300 text-neutral-700 hover:bg-neutral-100"
-                      onClick={toggleCamera}
-                    >
-                      {isCameraOn ? (
-                        <Video className="size-4" />
-                      ) : (
-                        <VideoOff className="size-4 text-rose-600" />
-                      )}
-                    </Button>
-                    <Button
-                      size="icon"
-                      className="rounded-full bg-rose-600 hover:bg-rose-700 text-white"
+                      className="rounded-full border-rose-300 text-rose-600 hover:bg-rose-50"
                       onClick={leaveChannel}
                       title="Leave Call"
                     >
                       <PhoneOff className="size-4" />
                     </Button>
                   </div>
-                )}
+                ) : (
+                  <>
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="rounded-full border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                        onClick={toggleMic}
+                      >
+                        {isMicOn ? (
+                          <Mic className="size-4" />
+                        ) : (
+                          <MicOff className="size-4 text-rose-600" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="rounded-full border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                        onClick={toggleCamera}
+                      >
+                        {isCameraOn ? (
+                          <Video className="size-4" />
+                        ) : (
+                          <VideoOff className="size-4 text-rose-600" />
+                        )}
+                      </Button>
+                      <Button
+                        size="icon"
+                        className="rounded-full bg-rose-600 hover:bg-rose-700 text-white"
+                        onClick={leaveChannel}
+                        title="Leave Call"
+                      >
+                        <PhoneOff className="size-4" />
+                      </Button>
+                    </div>
 
-                <div className="flex gap-2">
-                  <Input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                    placeholder="Type an answer..."
-                    className="border-neutral-200 bg-paper text-ink placeholder:text-neutral-400"
-                  />
-                  <Button
-                    size="icon"
-                    onClick={handleSend}
-                    disabled={submitting || !input.trim()}
-                    className="bg-ink text-paper hover:bg-neutral-800"
-                  >
-                    {submitting ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Send className="size-4" />
-                    )}
-                  </Button>
-                </div>
+                    <div className="flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700">
+                      <span className="relative flex size-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                        <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                      </span>
+                      {recording
+                        ? "Recording your mic for evaluation..."
+                        : "Live conversation — speak with your interviewer"}
+                    </div>
 
-                <Button
-                  onClick={handleEvaluateRound}
-                  disabled={evaluating || roundTurns.length < 2}
-                  variant="outline"
-                  className="w-full border-neutral-300 text-ink hover:bg-neutral-100 font-semibold"
-                >
-                  {evaluating ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" /> Evaluating
-                      round...
-                    </>
-                  ) : (
-                    <>
-                      <Flag className="size-4 text-indigo-500" /> Finish Round & Get Verdict
-                    </>
-                  )}
-                </Button>
-                {roundTurns.length < 2 && (
-                  <p className="text-center text-[10px] text-neutral-400">
-                    Answer at least twice before requesting a verdict.
-                  </p>
+                    <Button
+                      onClick={handleFinishRoundVoice}
+                      disabled={evaluating}
+                      className="w-full bg-ink text-paper hover:bg-neutral-800"
+                    >
+                      {evaluating ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" /> Transcribing
+                          & judging your round...
+                        </>
+                      ) : (
+                        <>
+                          <Flag className="size-4 text-paper" /> I'm done — judge
+                          this round
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
               </div>
             )}

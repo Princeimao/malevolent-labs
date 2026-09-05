@@ -80,7 +80,7 @@ export default function ProfilePage() {
       )
     : 0;
 
-  const switchMode = async (type: "creator" | "sharer" | "none") => {
+  const switchMode = async (type: "creator" | "both") => {
     setBusy(type);
     await dispatch(setContributorMode(type));
     setBusy(null);
@@ -161,9 +161,7 @@ export default function ProfilePage() {
                   <Target className="size-4" />
                 </span>
                 <div>
-                  <p className="text-2xl font-bold text-ink">
-                    {goals.length}
-                  </p>
+                  <p className="text-2xl font-bold text-ink">{goals.length}</p>
                   <p className="text-[11px] text-neutral-400">Practice goals</p>
                 </div>
               </CardContent>
@@ -226,33 +224,29 @@ export default function ProfilePage() {
 
         {/* Contributor section */}
         <section className="space-y-4">
-          <h2 className="text-lg font-bold text-ink">
-            Contributor workspace
-          </h2>
+          <h2 className="text-lg font-bold text-ink">Contributor workspace</h2>
 
           {!isContributor ? (
             <Card className="bg-white border-neutral-200">
               <CardContent className="p-6 space-y-4">
                 <p className="text-sm text-neutral-500 leading-relaxed max-w-2xl">
-                   Contributors build the platform. As a contributor
-                   you get two extra abilities — build interview loops with AI agents,
-                   and share your real interview stories — all on top of
-                   your full candidate workspace.
+                  Contributors build the platform. As a contributor you get two
+                  extra abilities — build interview loops with AI agents, and
+                  share your real interview stories — all on top of your full
+                  candidate workspace.
                 </p>
                 <Button
-                    onClick={() => switchMode("both")}
-                    disabled={!!busy}
-                    className="h-auto gap-1.5 py-3 px-6"
-                  >
-                    {busy === "both" ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="size-4" />
-                    )}
-                    <span className="font-semibold">
-                      Become a Contributor
-                    </span>
-                  </Button>
+                  onClick={() => switchMode("both")}
+                  disabled={!!busy}
+                  className="h-auto gap-1.5 py-3 px-6"
+                >
+                  {busy === "both" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-4" />
+                  )}
+                  <span className="font-semibold">Become a Contributor</span>
+                </Button>
               </CardContent>
             </Card>
           ) : (
@@ -303,7 +297,7 @@ export default function ProfilePage() {
                 </Card>
               </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Link href="/studio/agents">
                   <Button className="gap-1.5">
                     <Bot className="size-4" /> Agent Studio
@@ -327,7 +321,7 @@ export default function ProfilePage() {
                 </Link>
                 <Button
                   variant="ghost"
-                  onClick={() => switchMode("none")}
+                  onClick={() => switchMode("creator")}
                   disabled={busy === "none"}
                   className="text-neutral-400 hover:text-neutral-600"
                 >

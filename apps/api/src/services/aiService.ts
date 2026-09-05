@@ -11,7 +11,7 @@ import { GoogleGenAI } from '@google/genai';
  */
 
 const API_KEY = process.env.GEMINI_API_KEY || '';
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
 
 let client: GoogleGenAI | null = null;
 function genai(): GoogleGenAI {
@@ -38,6 +38,38 @@ export async function aiGenerate(prompt: string, maxOutputTokens = 4096): Promis
     return res.text || null;
   } catch (err) {
     console.error('Gemini call failed:', (err as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Speech-to-text for the candidate's recorded answers using Gemini audio
+ * understanding. Returns the spoken words as plain text.
+ */
+export async function transcribeAudio(opts: {
+  audioB64: string;
+  mimeType?: string;
+  sampleRate?: number;
+}): Promise<string | null> {
+  if (!aiEnabled()) return null;
+  try {
+    const res = await genai().models.generateContent({
+      model: MODEL,
+      contents: [
+        { text: 'Transcribe the spoken speech in this audio verbatim. Output ONLY the words that were spoken, with no commentary, timestamps, or punctuation embellishment.' },
+        {
+          inlineData: {
+            mimeType: opts.mimeType || 'audio/webm',
+            data: opts.audioB64,
+          },
+        },
+      ],
+      config: { temperature: 0, maxOutputTokens: 2048 },
+    });
+    const text = (res.text || '').trim();
+    return text || null;
+  } catch (err) {
+    console.error('Gemini transcription failed:', (err as Error).message);
     return null;
   }
 }

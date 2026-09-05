@@ -99,9 +99,7 @@ export default function InterviewRoomPage() {
         rtcClientRef.current = client;
 
         const appId =
-          session?.agoraAppId ||
-          process.env.NEXT_PUBLIC_AGORA_APP_ID ||
-          "8a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d";
+          session?.agoraAppId || process.env.NEXT_PUBLIC_AGORA_APP_ID!;
         const channel = session?.agoraChannelName || `room-${sessionId}`;
         const token = session?.agoraToken || null;
 
@@ -370,7 +368,9 @@ export default function InterviewRoomPage() {
               <div className="space-y-1">
                 <p className="text-xs font-semibold text-blue-400 flex items-center gap-1.5">
                   <span>{latestAiTurn.interviewerName}</span>
-                  <span className="text-[10px] text-neutral-500">• Question</span>
+                  <span className="text-[10px] text-neutral-500">
+                    • Question
+                  </span>
                 </p>
                 <p className="text-sm font-medium text-neutral-100 leading-relaxed">
                   {latestAiTurn.text}
@@ -407,8 +407,16 @@ export default function InterviewRoomPage() {
                   }`}
                 >
                   <div className="font-semibold text-[11px] flex justify-between">
-                    <span className={turn.sender === "candidate" ? "text-blue-300" : "text-emerald-400"}>
-                      {turn.sender === "candidate" ? "You" : turn.interviewerName}
+                    <span
+                      className={
+                        turn.sender === "candidate"
+                          ? "text-blue-300"
+                          : "text-emerald-400"
+                      }
+                    >
+                      {turn.sender === "candidate"
+                        ? "You"
+                        : turn.interviewerName}
                     </span>
                     <span className="text-neutral-400 text-[10px]">
                       Round {turn.roundIndex + 1}
@@ -467,7 +475,11 @@ export default function InterviewRoomPage() {
                   : "bg-red-600 hover:bg-red-700 text-white"
               }`}
             >
-              {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+              {isMicOn ? (
+                <Mic className="w-5 h-5" />
+              ) : (
+                <MicOff className="w-5 h-5" />
+              )}
             </button>
 
             {/* Camera Toggle Button */}
@@ -480,7 +492,11 @@ export default function InterviewRoomPage() {
                   : "bg-red-600 hover:bg-red-700 text-white"
               }`}
             >
-              {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+              {isCameraOn ? (
+                <Video className="w-5 h-5" />
+              ) : (
+                <VideoOff className="w-5 h-5" />
+              )}
             </button>
 
             {/* Transcript Toggle */}
